@@ -8,6 +8,7 @@ export async function middleware(request: NextRequest) {
   if (!url || !key) return response
 
   const supabase = createServerClient(url, key, {
+    cookieOptions: { name: 'sb-dawatnama-auth' },
     cookies: {
       getAll: () => request.cookies.getAll(),
       setAll: (list: { name: string; value: string; options: CookieOptions }[]) => {

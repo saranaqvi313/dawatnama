@@ -1,10 +1,11 @@
-import { createServerClient, type CookieOptions} from '@supabase/ssr'
+import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { asLang } from '../i18n'
 
 export async function createClient() {
   const store = await cookies()
   return createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
+    cookieOptions: { name: 'sb-dawatnama-auth' },
     cookies: {
       getAll: () => store.getAll(),
       setAll: (list: { name: string; value: string; options: CookieOptions }[]) => {
