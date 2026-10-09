@@ -85,10 +85,10 @@ export default function Editor({ invitation, siteUrl }: { invitation: Invitation
               <div className="two">{text('Name 1', 'name1', 'e.g. bride or host')}{text('Name 2 (optional)', 'name2', 'e.g. groom')}</div>
               {text('Hosted by', 'hosts', 'e.g. the family name')}
               <label>Message<textarea rows={3} value={content.message} onChange={(e) => c('message', e.target.value)} dir="auto" /></label>
-              <label>Photo
+              <label>Image (photo of the couple, host or venue)
                 <input type="file" accept="image/*" onChange={(e) => upload(e.target.files?.[0])} />
               </label>
-              {content.photoUrl && <button type="button" className="link" onClick={() => c('photoUrl', '')}>Remove photo</button>}
+              {content.photoUrl && <button type="button" className="link" onClick={() => c('photoUrl', '')}>Remove image</button>}
               {text('Background music (link to an .mp3)', 'musicUrl', 'https://…')}
               <label>Family list (one per line)
                 <textarea rows={4} value={content.family.join('\n')} onChange={(e) => c('family', e.target.value.split('\n'))} dir="auto" />
@@ -130,8 +130,8 @@ export default function Editor({ invitation, siteUrl }: { invitation: Invitation
                   ))}
                 </div>
                 <div className="three">
-                  <label>Background<input type="color" value={design.bg} onChange={(e) => d('bg', e.target.value)} /></label>
-                  <label>Text<input type="color" value={design.ink} onChange={(e) => d('ink', e.target.value)} /></label>
+                  <label>Card colour<input type="color" value={design.bg} onChange={(e) => d('bg', e.target.value)} /></label>
+                  <label>Font colour<input type="color" value={design.ink} onChange={(e) => d('ink', e.target.value)} /></label>
                   <label>Accent<input type="color" value={design.accent} onChange={(e) => d('accent', e.target.value)} /></label>
                 </div>
               </fieldset>

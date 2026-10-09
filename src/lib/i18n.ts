@@ -2,7 +2,7 @@ import type { Lang } from './types'
 
 export const dict = {
   en: {
-    brand: 'Dawatnama', templates: 'Templates', how: 'How it works', faq: 'FAQ', signin: 'Sign in', dashboard: 'My invitations', signout: 'Sign out',
+    brand: 'Dawatnama', templates: 'Templates', how: 'How it works', faq: 'FAQ', signin: 'Sign in', dashboard: 'My invitations', signout: 'Log out',
     heroTitle: 'Invitations your guests will open twice', heroSub: 'Animated digital shadi cards and event invitations with RSVP, maps and countdown. Design it your way, share one link on WhatsApp. Free.',
     ctaCreate: 'Create my invitation', ctaLive: 'See a live card',
     whyKicker: 'Why Dawatnama', whyTitle: 'More than a printed card can do',

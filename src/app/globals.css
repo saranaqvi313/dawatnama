@@ -20,6 +20,7 @@ button.link.danger { color: var(--red); }
 .nav { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: .9rem clamp(1rem, 4vw, 3rem); position: sticky; top: 0; z-index: 20; background: #faf6eeee; backdrop-filter: blur(8px); border-bottom: 1px solid var(--line); }
 .nav nav { display: flex; align-items: center; gap: clamp(.7rem, 2vw, 1.6rem); flex-wrap: wrap; justify-content: flex-end; }
 .nav nav a:not(.btn) { text-decoration: none; font-size: .95rem; }
+.who { font-weight: 600; font-size: .95rem; max-width: 12rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .logo { display: flex; align-items: center; gap: .5rem; font: 700 1.3rem 'Playfair Display', serif; text-decoration: none; }
 .logo span { display: grid; place-items: center; width: 2rem; height: 2rem; border-radius: 50% 50% 8px 8px; background: var(--green); color: var(--gold); font: 700 1.1rem/1 'Playfair Display', serif; }
 
