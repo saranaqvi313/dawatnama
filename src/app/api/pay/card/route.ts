@@ -1,13 +1,13 @@
 import { NextResponse, type NextRequest } from 'next/server'
-import { cardCheckoutFields, easypaisaConfig, toLocalMobile } from '@/lib/easypaisa'
-import { autoPostResponse } from '@/lib/autopost'
-import { createPendingPayment, paymentMode, sameOrigin, siteUrl } from '@/lib/payments'
+import { createPendingPayment, newOrderRef, paymentMode, sameOrigin, siteUrl } from '@/lib/payments'
 import { isPremium } from '@/lib/premium'
+import { serverPrice } from '@/lib/pricing'
+import { checkoutUrl, createTracker, safepayConfig } from '@/lib/safepay'
 import { createClient } from '@/lib/supabase/server'
 
 export const runtime = 'nodejs'
 
-/** Starts a card payment: records the order, then hands the browser to Easypaisa's card page. */
+/** Starts a card payment: creates the Safepay payment, records it, sends the customer to Safepay. */
 export async function POST(request: NextRequest) {
   const site = siteUrl(request.nextUrl.origin)
   if (!sameOrigin(request, site)) return new NextResponse('Forbidden', { status: 403 })
@@ -18,17 +18,24 @@ export async function POST(request: NextRequest) {
   if (await isPremium(supabase, user.id)) return NextResponse.redirect(`${site}/premium?result=paid`, 303)
 
   const mode = paymentMode()
-  if (mode === 'demo') return NextResponse.redirect(`${site}/premium/test-checkout?method=card`, 303)
-  const config = easypaisaConfig()
-  if (mode !== 'easypaisa' || !config) return NextResponse.redirect(`${site}/premium?result=unavailable`, 303)
+  if (mode === 'demo') return NextResponse.redirect(`${site}/premium/test-checkout`, 303)
+  const config = safepayConfig()
+  if (mode !== 'card' || !config) return NextResponse.redirect(`${site}/premium?result=unavailable`, 303)
 
-  const { orderRef, amountPkr } = await createPendingPayment(user.id, 'card')
-  const { action, fields } = cardCheckoutFields(config, {
-    orderRef,
-    amountPkr,
-    postBackURL: `${site}/api/pay/card/return?order=${orderRef}`,
-    mobile: user.phone ? toLocalMobile(user.phone) ?? undefined : undefined,
-    email: user.email || undefined,
-  })
-  return autoPostResponse(action, fields)
+  try {
+    const amountPkr = serverPrice()
+    const tracker = await createTracker(config, amountPkr)
+    const orderRef = newOrderRef()
+    await createPendingPayment(user.id, 'card', { orderRef, tracker, amountPkr })
+    const url = checkoutUrl(config, {
+      token: tracker,
+      orderRef,
+      redirectUrl: `${site}/api/pay/card/done`,
+      cancelUrl: `${site}/premium?result=cancelled`,
+    })
+    return NextResponse.redirect(url, 303)
+  } catch (err) {
+    console.error('card payment start failed', err instanceof Error ? err.message : err)
+    return NextResponse.redirect(`${site}/premium?result=error`, 303)
+  }
 }

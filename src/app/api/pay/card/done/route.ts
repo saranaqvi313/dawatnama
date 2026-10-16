@@ -1,17 +1,36 @@
 import { NextResponse, type NextRequest } from 'next/server'
-import { siteUrl, verifyAndComplete } from '@/lib/payments'
+import { completeVerifiedPayment, siteUrl } from '@/lib/payments'
+import { safepayConfig, verifyRedirectSignature } from '@/lib/safepay'
 
 export const runtime = 'nodejs'
 
 /**
- * Easypaisa step 2 callback. The status in the URL is only a hint: the order is confirmed
- * with Easypaisa's Inquire API before Premium is switched on.
+ * Safepay sends the customer back here after a successful card payment, with tracker,
+ * sig, reference and order_id. Premium is switched on only if the signature is valid and
+ * the tracker is the one created for this order.
  */
 async function handle(request: NextRequest) {
   const site = siteUrl(request.nextUrl.origin)
-  const order = request.nextUrl.searchParams.get('order') || request.nextUrl.searchParams.get('orderRefNum') || ''
-  const outcome = await verifyAndComplete(order).catch(() => 'pending' as const)
-  return NextResponse.redirect(`${site}/premium?result=${outcome}${outcome === 'pending' ? `&order=${encodeURIComponent(order)}` : ''}`, 303)
+  const q = request.nextUrl.searchParams
+  let fields: Record<string, string> = Object.fromEntries(q.entries())
+  if (request.method === 'POST') {
+    const type = request.headers.get('content-type') ?? ''
+    if (type.includes('application/json')) fields = { ...fields, ...((await request.json().catch(() => ({}))) as Record<string, string>) }
+    else {
+      const form = await request.formData().catch(() => null)
+      if (form) for (const [k, v] of form.entries()) if (typeof v === 'string') fields[k] = v
+    }
+  }
+  const tracker = String(fields.tracker ?? '')
+  const sig = String(fields.sig ?? '')
+  const orderRef = String(fields.order_id ?? '')
+  const config = safepayConfig()
+
+  if (!config || !verifyRedirectSignature(config.secret, tracker, sig)) {
+    return NextResponse.redirect(`${site}/premium?result=failed`, 303)
+  }
+  const ok = await completeVerifiedPayment(orderRef, tracker, 'SAFEPAY_REDIRECT').catch(() => false)
+  return NextResponse.redirect(`${site}/premium?result=${ok ? 'paid' : 'failed'}`, 303)
 }
 
 export const GET = handle

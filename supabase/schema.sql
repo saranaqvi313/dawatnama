@@ -83,7 +83,7 @@ do $$ begin
 exception when duplicate_object then null; end $$;
 
 -- One row per user who has paid. Users can read their own row; only the server
--- (service role, after the payment is verified with Easypaisa) can write it.
+-- (service role, after the payment is verified with Safepay) can write it.
 create table if not exists public.profiles (
   user_id uuid primary key references auth.users(id) on delete cascade,
   is_premium boolean not null default false,
@@ -99,7 +99,7 @@ create table if not exists public.payments (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
   order_ref text not null unique check (order_ref ~ '^[A-Za-z0-9]{6,30}$'),
-  method text not null check (method in ('card', 'easypaisa', 'demo')),
+  method text not null check (method in ('card', 'demo')),
   amount_pkr int not null check (amount_pkr > 0),
   status text not null default 'pending' check (status in ('pending', 'paid', 'failed')),
   gateway_ref text,
@@ -108,6 +108,8 @@ create table if not exists public.payments (
   paid_at timestamptz
 );
 create index if not exists payments_user_idx on public.payments(user_id, created_at desc);
+-- Webhooks look payments up by the gateway's tracker token.
+create unique index if not exists payments_gateway_ref_idx on public.payments(gateway_ref) where gateway_ref is not null;
 alter table public.payments enable row level security;
 drop policy if exists "read own payments" on public.payments;
 create policy "read own payments" on public.payments for select to authenticated using (user_id = auth.uid());
@@ -120,7 +122,7 @@ revoke all on function public.is_premium(uuid) from public;
 grant execute on function public.is_premium(uuid) to authenticated, service_role;
 
 -- Marks a verified payment as paid and switches Premium on, atomically and only once.
--- Called by the server after Easypaisa confirms the transaction.
+-- Called by the server after Safepay confirms the transaction.
 create or replace function public.complete_payment(p_order_ref text, p_gateway_ref text, p_gateway_status text)
 returns boolean language plpgsql security definer set search_path = '' as $$
 declare v_user uuid;

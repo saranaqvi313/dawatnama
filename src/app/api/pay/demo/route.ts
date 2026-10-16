@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server'
-import { createPendingPayment, paymentMode, sameOrigin, siteUrl, verifyAndComplete } from '@/lib/payments'
+import { completeVerifiedPayment, createPendingPayment, newOrderRef, paymentMode, sameOrigin, siteUrl } from '@/lib/payments'
 import { createClient } from '@/lib/supabase/server'
 
 export const runtime = 'nodejs'
@@ -12,7 +12,9 @@ export async function POST(request: NextRequest) {
   if (!data.user) return NextResponse.redirect(`${site}/login?next=/premium`, 303)
   const form = await request.formData()
   if (form.get('outcome') !== 'pay') return NextResponse.redirect(`${site}/premium?result=failed`, 303)
-  const { orderRef } = await createPendingPayment(data.user.id, 'demo')
-  const outcome = await verifyAndComplete(orderRef)
-  return NextResponse.redirect(`${site}/premium?result=${outcome}`, 303)
+  const orderRef = newOrderRef()
+  const tracker = `demo-${orderRef}`
+  await createPendingPayment(data.user.id, 'demo', { orderRef, tracker })
+  const ok = await completeVerifiedPayment(orderRef, tracker, 'DEMO_PAID')
+  return NextResponse.redirect(`${site}/premium?result=${ok ? 'paid' : 'failed'}`, 303)
 }

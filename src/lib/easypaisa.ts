@@ -1,9 +1,8 @@
 /**
- * Easypaisa (Easypay) merchant integration. Server-only: never import from a client component.
+ * Card payments through Easypaisa's (Easypay) hosted card page. Server-only: never import
+ * from a client component.
  *
- *  - Card:      hosted redirect. Index.jsf → our /return (auth_token) → Confirm.jsf → our /done.
- *  - Easypaisa: "Mobile Account" REST call. The customer approves on their phone; the call
- *               returns when they approve, decline or time out.
+ *  - Card: hosted redirect. Index.jsf → our /return (auth_token) → Confirm.jsf → our /done.
  *  - Every payment is confirmed with the Inquire Transaction API before Premium is granted.
  *    Nothing the browser sends back is trusted on its own.
  *
@@ -94,20 +93,6 @@ async function rest<T>(c: EasypaisaConfig, path: string, body: Record<string, st
   return (await res.json()) as T
 }
 
-export type MaResult = { responseCode?: string; responseDesc?: string; transactionId?: string; orderId?: string }
-
-/** Charges an Easypaisa mobile account. Waits while the customer approves on their phone. */
-export function initiateMobileAccount(c: EasypaisaConfig, o: { orderRef: string; amountPkr: number; mobile: string; email?: string }) {
-  return rest<MaResult>(c, 'initiate-ma-transaction', {
-    orderId: o.orderRef,
-    storeId: c.storeId,
-    transactionAmount: formatAmount(o.amountPkr),
-    transactionType: 'MA',
-    mobileAccountNo: o.mobile,
-    emailAddress: o.email || 'noreply@dawatnama.pk',
-  }, 110_000)
-}
-
 export type InquiryResult = {
   responseCode?: string
   responseDesc?: string
@@ -122,7 +107,7 @@ export function inquire(c: EasypaisaConfig, orderRef: string) {
   return rest<InquiryResult>(c, 'inquire-transaction', { orderId: orderRef, storeId: c.storeId, accountNum: c.accountNum }, 20_000)
 }
 
-/** 03001234567 format, which Easypaisa expects for mobile accounts. */
+/** 03001234567 format, used to pre-fill the payment page. */
 export function toLocalMobile(raw: string): string | null {
   const d = raw.replace(/\D/g, '')
   if (/^03\d{9}$/.test(d)) return d

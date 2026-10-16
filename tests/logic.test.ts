@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict'
-import { createDecipheriv } from 'node:crypto'
 import { test } from 'node:test'
 import { createElement, MAX_ELEMENTS, MAX_TEXT, safeImageUrl, sanitizeCanvas } from '../src/lib/canvas'
 import { CANVAS_TEMPLATES } from '../src/lib/canvasTemplates'
-import { cardCheckoutFields, expiryDate, formatAmount, merchantHash, toLocalMobile } from '../src/lib/easypaisa'
+import { checkoutUrl, verifyRedirectSignature, verifyWebhookSignature } from '../src/lib/safepay'
+import { createHmac } from 'node:crypto'
 import { normalizePhone, parseIdentity } from '../src/lib/identity'
 
 test('Pakistani numbers normalise to E.164', () => {
@@ -21,32 +21,33 @@ test('identity: phone or email, phone only when enabled', () => {
   assert.ok('error' in parseIdentity('', true))
 })
 
-test('easypaisa: amount, expiry and mobile formats', () => {
-  assert.equal(formatAmount(1499), '1499.0')
-  assert.equal(expiryDate(60, new Date('2026-10-16T03:00:00Z')), '20261016 090000') // 03:00 UTC + 5h + 1h
-  assert.equal(toLocalMobile('+923451234567'), '03451234567')
-  assert.equal(toLocalMobile('0345 1234567'), '03451234567')
-  assert.equal(toLocalMobile('12345'), null)
+test('safepay: checkout URL carries the tracker, order and return URLs', () => {
+  const c = { env: 'sandbox' as const, api: 'https://sandbox.api.getsafepay.com', checkout: 'https://sandbox.api.getsafepay.com/checkout', apiKey: 'sec_x', secret: 's', webhookSecret: 'w' }
+  const url = new URL(checkoutUrl(c, { token: 'track_123abc', orderRef: 'DNABC123', redirectUrl: 'https://site/api/pay/card/done', cancelUrl: 'https://site/premium?result=cancelled' }))
+  assert.equal(url.origin + url.pathname, 'https://sandbox.api.getsafepay.com/checkout/pay')
+  assert.equal(url.searchParams.get('beacon'), 'track_123abc')
+  assert.equal(url.searchParams.get('order_id'), 'DNABC123')
+  assert.equal(url.searchParams.get('env'), 'sandbox')
+  assert.equal(url.searchParams.get('redirect_url'), 'https://site/api/pay/card/done')
+  assert.equal(url.searchParams.get('cancel_url'), 'https://site/premium?result=cancelled')
 })
 
-test('easypaisa: merchantHashedReq is AES-ECB over sorted fields, base64', () => {
-  const key = '0123456789ABCDEF'
-  const fields = { storeId: '43', amount: '10.0', postBackURL: 'https://x.pk/r', orderRefNum: 'DN1', autoRedirect: '1' }
-  const hash = merchantHash(fields, key)
-  const d = createDecipheriv('aes-128-ecb', Buffer.from(key), null)
-  const plain = Buffer.concat([d.update(Buffer.from(hash, 'base64')), d.final()]).toString()
-  assert.equal(plain, 'amount=10.0&autoRedirect=1&orderRefNum=DN1&postBackURL=https://x.pk/r&storeId=43')
-  assert.throws(() => merchantHash(fields, 'short'))
+test('safepay: redirect signature is HMAC-SHA256(secret, tracker)', () => {
+  const sig = createHmac('sha256', 'shh').update('track_123abc').digest('hex')
+  assert.ok(verifyRedirectSignature('shh', 'track_123abc', sig))
+  assert.ok(verifyRedirectSignature('shh', 'track_123abc', sig.toUpperCase()))
+  assert.ok(!verifyRedirectSignature('shh', 'track_OTHER', sig), 'signature is bound to the tracker')
+  assert.ok(!verifyRedirectSignature('wrong', 'track_123abc', sig), 'wrong secret')
+  assert.ok(!verifyRedirectSignature('shh', 'track_123abc', ''), 'missing signature')
+  assert.ok(!verifyRedirectSignature('shh', 'track_123abc', 'zz' + sig.slice(2)), 'non-hex')
 })
 
-test('easypaisa: card checkout fields include a hash of everything else', () => {
-  const c = { host: 'https://easypaystg.easypaisa.com.pk', storeId: '43', hashKey: '0123456789ABCDEF', accountNum: '1', username: 'u', password: 'p' }
-  const { action, fields } = cardCheckoutFields(c, { orderRef: 'DNABC123', amountPkr: 1499, postBackURL: 'https://site/api/pay/card/return?order=DNABC123' })
-  assert.equal(action, 'https://easypaystg.easypaisa.com.pk/easypay/Index.jsf')
-  assert.equal(fields.paymentMethod, 'CC_PAYMENT_METHOD')
-  assert.equal(fields.amount, '1499.0')
-  const { merchantHashedReq, ...rest } = fields
-  assert.equal(merchantHashedReq, merchantHash(rest, c.hashKey))
+test('safepay: webhook signature is HMAC-SHA512 over the JSON of body.data', () => {
+  const data = { tracker: { token: 'track_123abc' }, state: 'PAID' }
+  const sig = createHmac('sha512', 'wh').update(Buffer.from(JSON.stringify(data))).digest('hex')
+  assert.ok(verifyWebhookSignature('wh', data, sig))
+  assert.ok(!verifyWebhookSignature('wh', { ...data, state: 'FAILED' }, sig), 'tampered payload')
+  assert.ok(!verifyWebhookSignature('wh', data, null))
 })
 
 test('canvas: sanitizer rejects unsafe values', () => {
@@ -85,17 +86,6 @@ test('canvas: templates survive the sanitizer unchanged and new elements are val
     const el = createElement(k)
     assert.deepEqual(sanitizeCanvas({ elements: [el] }).elements[0], el, k)
   }
-})
-
-test('payments: only a full PAID amount grants Premium', async () => {
-  const { decideOutcome } = await import('../src/lib/payments')
-  assert.equal(decideOutcome({ transactionStatus: 'PAID', transactionAmount: '1499.0' }, 1499), 'paid')
-  assert.equal(decideOutcome({ transactionStatus: 'paid', transactionAmount: 1499 }, 1499), 'paid')
-  assert.equal(decideOutcome({ transactionStatus: 'PAID', transactionAmount: '1.0' }, 1499), 'failed', 'underpaid')
-  assert.equal(decideOutcome({ transactionStatus: 'PAID' }, 1499), 'failed', 'amount missing')
-  assert.equal(decideOutcome({ transactionStatus: 'PENDING', transactionAmount: '1499.0' }, 1499), 'pending')
-  assert.equal(decideOutcome({}, 1499), 'pending')
-  for (const s of ['FAILED', 'EXPIRED', 'BLOCKED', 'REVERSED']) assert.equal(decideOutcome({ transactionStatus: s }, 1499), 'failed', s)
 })
 
 test('payments: demo mode is impossible on the production deployment', async () => {

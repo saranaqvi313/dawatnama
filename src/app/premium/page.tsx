@@ -1,7 +1,5 @@
 import Link from 'next/link'
 import Nav from '@/components/Nav'
-import PayWithEasypaisa from '@/components/PayWithEasypaisa'
-import PendingCheck from '@/components/PendingCheck'
 import { paymentMode } from '@/lib/payments'
 import { isPremium } from '@/lib/premium'
 import { PRICE_LABEL } from '@/lib/pricing'
@@ -19,12 +17,13 @@ const PERKS = [
 
 const RESULT: Record<string, { cls: string; text: string }> = {
   paid: { cls: 'ok', text: 'Payment successful. Premium is now active on your account.' },
-  failed: { cls: 'err', text: 'The payment did not go through. You have not been charged. Please try again.' },
-  pending: { cls: 'muted', text: 'Your payment is being confirmed by Easypaisa. This page will update automatically.' },
+  failed: { cls: 'err', text: 'We could not confirm this payment. Please try again. If money was taken from your card, contact us with the time of payment and we will sort it out.' },
+  cancelled: { cls: 'muted', text: 'Payment cancelled. You have not been charged.' },
+  error: { cls: 'err', text: 'We could not start the payment. Please try again in a minute.' },
   unavailable: { cls: 'err', text: 'Payments are not set up on this site yet.' },
 }
 
-export default async function Premium({ searchParams }: { searchParams: Promise<{ result?: string; order?: string }> }) {
+export default async function Premium({ searchParams }: { searchParams: Promise<{ result?: string }> }) {
   const sp = await searchParams
   const supabase = await createClient()
   const { data } = await supabase.auth.getUser()
@@ -44,7 +43,6 @@ export default async function Premium({ searchParams }: { searchParams: Promise<
           <ul className="perks">{PERKS.map((p) => <li key={p}>{p}</li>)}</ul>
 
           {result && <p className={`notice ${result.cls}`} role="status">{result.text}</p>}
-          {sp.result === 'pending' && sp.order && <PendingCheck order={sp.order} />}
 
           {premium ? (
             <div className="premium-active">
@@ -61,15 +59,13 @@ export default async function Premium({ searchParams }: { searchParams: Promise<
           ) : (
             <div className="pay-options">
               {mode === 'demo' && <p className="notice muted">Test mode: no real money is charged.</p>}
-              <h2>Choose how to pay</h2>
               <form action="/api/pay/card" method="post" className="pay-option">
                 <div>
-                  <h3>Debit or credit card</h3>
-                  <p className="muted">Visa or Mastercard, on Easypaisa&apos;s secure card page.</p>
+                  <h3>Pay by debit or credit card</h3>
+                  <p className="muted">Visa or Mastercard from any bank. You&apos;ll enter your card on Safepay&apos;s secure payment page, then come straight back here.</p>
                 </div>
                 <button className="btn">Pay {PRICE_LABEL} by card</button>
               </form>
-              <PayWithEasypaisa price={PRICE_LABEL} defaultMobile={user.phone ? `0${user.phone.replace(/^\+?92/, '')}` : ''} />
             </div>
           )}
         </div>

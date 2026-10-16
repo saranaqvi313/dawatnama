@@ -1,7 +1,7 @@
 # Dawatnama
 
 Digital invitations for Pakistan: animated cards with RSVP, countdown, maps, a design editor and a drag-and-drop card designer.
-Built with Next.js 15, Supabase (database, sign-in, photo storage), Easypaisa (payments) and Three.js.
+Built with Next.js 15, Supabase (database, sign-in, photo storage), Safepay (card payments) and Three.js.
 
 ## What is inside
 
@@ -10,7 +10,7 @@ Built with Next.js 15, Supabase (database, sign-in, photo storage), Easypaisa (p
 | Landing page, including the 3 designer templates | `src/app/page.tsx` (`#designs`) |
 | Templates and live previews | `/templates`, `/preview/[template]` |
 | Sign-in with a one-time code (phone or email, no links) | `/login` → `/login/verify` |
-| Premium page and payments (card + Easypaisa) | `/premium`, `src/app/api/pay/*`, `src/lib/easypaisa.ts` |
+| Premium page and card payments | `/premium`, `src/app/api/pay/*`, `src/lib/safepay.ts` |
 | Drag-and-drop designer (Premium) | `/design/[id]`, `src/components/canvas/*` |
 | Dashboard, editor, RSVP list, CSV export | `/dashboard/...` |
 | Public invitation / shared card link | `/i/[slug]` |
@@ -25,7 +25,7 @@ Built with Next.js 15, Supabase (database, sign-in, photo storage), Easypaisa (p
 
 Premium is enforced by the database (`enforce_premium_customisation` trigger), not only by the app,
 so it cannot be bypassed with the public anon key. Only the server can switch Premium on, and only
-after Easypaisa confirms the payment.
+after Safepay confirms the payment.
 
 ## 1. Set up Supabase
 
@@ -55,28 +55,28 @@ Supabase supports phone sign-in, but it sends SMS through a provider you pay for
 
 Numbers can be typed as `0300 1234567`, `3001234567`, `+92 300 1234567` or `923001234567`.
 
-## 2. Set up Easypaisa payments
+## 2. Set up card payments (Safepay)
 
-You need an **Easypaisa merchant account** (apply at easypaisa.com.pk → Business / Online Payment Gateway). From its merchant portal:
+Customers pay with a Visa or Mastercard debit/credit card from any bank, on Safepay's secure page.
+Card details never reach your server.
 
-| Variable | Where it comes from |
-| --- | --- |
-| `EASYPAISA_STORE_ID` | Store ID |
-| `EASYPAISA_HASH_KEY` | Account Settings → Generate Hash Key |
-| `EASYPAISA_ACCOUNT_NUM` | Profile → EWP account number |
-| `EASYPAISA_USERNAME`, `EASYPAISA_PASSWORD` | REST API credentials issued by Easypaisa |
-
-In the portal, set the **IPN (Instant Payment Notification) URL** to `https://YOUR-SITE/api/pay/ipn`.
+1. Sign up at https://getsafepay.com (Merchant sign-up). You start in **sandbox** (test mode) straight away;
+   going live needs your business details (CNIC, bank account; NTN for companies) and Safepay's approval.
+2. In the Safepay dashboard open **Developer** and copy:
+   - the **API key** → `SAFEPAY_API_KEY`
+   - the **secret key** (webhook / shared secret) → `SAFEPAY_SECRET_KEY`
+3. Under **Developer → Webhooks**, add `https://YOUR-SITE/api/pay/webhook`.
+   (Backup in case a customer closes the browser before returning.)
+4. Test with `SAFEPAY_ENV=sandbox` and Safepay's test cards, then switch to `production` with the live keys.
 
 How it works:
 
-- **Card**: the customer is sent to Easypaisa's secure card page and returns to `/api/pay/card/return` → `/api/pay/card/done`.
-- **Easypaisa account**: the customer enters their Easypaisa number and approves the request in the Easypaisa app.
-- Either way, the server asks Easypaisa's Inquire API whether the order was paid in full before switching Premium on. Nothing sent back by the browser is trusted on its own.
+- **Pay by card** creates a Safepay payment for the price set on the server (`PREMIUM_PRICE_PKR`) and sends the customer to Safepay.
+- After paying, Safepay sends them back to `/api/pay/card/done` with a signed confirmation.
+- Premium switches on only if the signature is valid **and** it is for the payment we created for that order.
+- The webhook does the same check, so Premium still switches on if the customer never comes back.
 
-Start with `EASYPAISA_ENV=sandbox` and Easypaisa's test credentials, then switch to `production` and the live credentials.
-
-**No merchant account yet?** Set `PAYMENT_MODE=demo` to try the whole flow with a test checkout (no money moves).
+**No Safepay keys yet?** Set `PAYMENT_MODE=demo` to try the whole flow with a test checkout (no money moves).
 Demo mode is ignored on Vercel's production deployment, so it can never give Premium away on the live site.
 
 ## 3. Deploy on Vercel
@@ -91,9 +91,9 @@ Import the repository, then add these **Environment Variables** (all are describ
 | `NEXT_PUBLIC_SITE_URL` | e.g. `https://dawatnama.vercel.app` |
 | `NEXT_PUBLIC_PHONE_LOGIN` | `on` once SMS is set up, otherwise `off` |
 | `PREMIUM_PRICE_PKR`, `NEXT_PUBLIC_PREMIUM_PRICE_PKR` | `1499` |
-| `PAYMENT_MODE` | `easypaisa` |
-| `EASYPAISA_ENV` | `sandbox`, later `production` |
-| `EASYPAISA_STORE_ID`, `EASYPAISA_HASH_KEY`, `EASYPAISA_ACCOUNT_NUM`, `EASYPAISA_USERNAME`, `EASYPAISA_PASSWORD` | from the merchant portal |
+| `PAYMENT_MODE` | `card` (or `demo` on Preview deployments) |
+| `SAFEPAY_ENV` | `sandbox`, later `production` |
+| `SAFEPAY_API_KEY`, `SAFEPAY_SECRET_KEY` | from Safepay → Developer |
 
 Then in Supabase **Authentication → URL Configuration**, set **Site URL** to your Vercel address.
 (Redirect URLs are no longer needed: sign-in uses codes, not links.)
@@ -113,10 +113,10 @@ Open it from the home page (**Design every detail yourself** → **Customise thi
 ## Run locally
 
 ```bash
-cp .env.example .env.local   # fill in the values; PAYMENT_MODE=demo to test without Easypaisa
+cp .env.example .env.local   # fill in the values; PAYMENT_MODE=demo to test without Safepay keys
 npm install
 npm run dev
-npm test                      # unit tests: phone parsing, Easypaisa hash, payment rules, designer validation
+npm test                      # unit tests: phone parsing, Safepay signatures, payment rules, designer validation
 ```
 
 Database security tests (on a throwaway local PostgreSQL, never your Supabase project):
@@ -130,6 +130,6 @@ psql -d scratch -f supabase/tests/premium_gate.sql   # 22 checks; rolls back
 ## Security notes
 
 - The anon key is public by design; every table has row-level security.
-- `SUPABASE_SERVICE_ROLE_KEY` bypasses row-level security. It is used only in `src/lib/payments.ts` on the server. Never prefix it with `NEXT_PUBLIC_`.
+- `SUPABASE_SERVICE_ROLE_KEY` and `SAFEPAY_SECRET_KEY` are server-only secrets. Never prefix them with `NEXT_PUBLIC_`.
 - Users can read their own Premium status and payments, but cannot write either. `complete_payment()` can only be called by the server.
 - Designer cards are validated on save and again before display (colours, fonts, image URLs must be https, size limits).
