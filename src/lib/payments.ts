@@ -57,8 +57,12 @@ export async function orderForTracker(tracker: string): Promise<string | null> {
   return data?.order_ref ?? null
 }
 
+/**
+ * Where to send the visitor back to: always the address they are on now, so they stay signed in
+ * (cookies belong to one address). NEXT_PUBLIC_SITE_URL is only a fallback.
+ */
 export function siteUrl(requestOrigin: string) {
-  return (process.env.NEXT_PUBLIC_SITE_URL || requestOrigin).replace(/\/+$/, '')
+  return (requestOrigin || process.env.NEXT_PUBLIC_SITE_URL || '').replace(/\/+$/, '')
 }
 
 /** Rejects cross-site form posts to our own endpoints (defence in depth on top of SameSite cookies). */
