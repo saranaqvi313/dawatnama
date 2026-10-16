@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 
 export const runtime = 'nodejs'
 
-/** Test checkout (PAYMENT_METHOD=demo, never on the production deployment). No money moves. */
+/** Test checkout (PAYMENT_MODE=demo, never on the production deployment). No money moves. */
 export async function POST(request: NextRequest) {
   const site = siteUrl(request.nextUrl.origin)
   if (paymentMode() !== 'demo' || !sameOrigin(request, site)) return new NextResponse('Not available', { status: 404 })

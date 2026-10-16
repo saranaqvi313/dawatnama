@@ -9,10 +9,10 @@ export type PaymentMethod = 'card' | 'demo'
 /**
  * "card": real card payments through Safepay.
  * "demo": a test checkout without a Safepay account. Never runs on Vercel's production
- *         deployment, whatever PAYMENT_METHOD says.
+ *         deployment, whatever PAYMENT_MODE says.
  */
 export function paymentMode(): 'card' | 'demo' | 'off' {
-  if (process.env.PAYMENT_METHOD === 'demo' && process.env.VERCEL_ENV !== 'production') return 'demo'
+  if (process.env.PAYMENT_MODE === 'demo' && process.env.VERCEL_ENV !== 'production') return 'demo'
   if (safepayConfig() && process.env.SUPABASE_SERVICE_ROLE_KEY) return 'card'
   return 'off'
 }

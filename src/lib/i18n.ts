@@ -21,7 +21,7 @@ export const dict = {
     faqTitle: 'Questions',
     faqs: [['Is it free?', 'Creating, publishing and sharing invitations from a template is free. Customising the design (colours, fonts, animations and the drag-and-drop designer) is Premium: a one-time ' + PRICE_LABEL + ' that unlocks it for all your cards.'], ['How can I pay?', 'With any Visa or Mastercard debit or credit card, from any bank, on a secure payment page. Premium switches on as soon as the payment is confirmed.'], ['Can I change details after publishing?', 'Yes. Edit from your dashboard; the same link updates instantly.'], ['How do guests RSVP?', 'At the bottom of the card they enter their name and attendance. You see it in your dashboard and can export a CSV.'], ['Do guests need an app?', 'No. The link opens in any browser on any phone.']],
     finalTitle: 'Your celebration starts with the invitation.', footer: 'Made in Pakistan',
-    loginTitle: 'Sign in', loginSubPhone: 'Enter your phone number or email. We will send you a one-time code. No password needed.', loginSubEmail: 'Enter your email. We will send you a one-time code. No password needed.',
+    loginTitle: 'Sign in or sign up', loginSubPhone: 'Use your mobile number or email. We will send you a one-time code. No password needed.', loginSubEmail: 'Enter your email. We will send you a one-time code. No password needed.',
     myInvites: 'My invitations', newInvite: 'New invitation', empty: 'You have no invitations yet. Pick a template to begin.', edit: 'Edit', guests: 'RSVPs', view: 'View', live: 'Live', draft: 'Draft', del: 'Delete',
   },
 }

@@ -91,7 +91,7 @@ test('canvas: templates survive the sanitizer unchanged and new elements are val
 test('payments: demo mode is impossible on the production deployment', async () => {
   const { paymentMode } = await import('../src/lib/payments')
   const env = { ...process.env }
-  process.env.PAYMENT_METHOD = 'demo'
+  process.env.PAYMENT_MODE = 'demo'
   process.env.VERCEL_ENV = 'production'
   assert.notEqual(paymentMode(), 'demo')
   process.env.VERCEL_ENV = 'preview'

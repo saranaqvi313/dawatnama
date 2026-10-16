@@ -5,7 +5,7 @@ import { PRICE_LABEL } from '@/lib/pricing'
 
 export const dynamic = 'force-dynamic'
 
-/** Stand-in for Safepay's card page while PAYMENT_METHOD=demo. Unavailable on the production deployment. */
+/** Stand-in for Safepay's card page while PAYMENT_MODE=demo. Unavailable on the production deployment. */
 export default async function TestCheckout() {
   if (paymentMode() !== 'demo') notFound()
   return (
