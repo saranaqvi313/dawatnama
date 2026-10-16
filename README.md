@@ -9,7 +9,7 @@ Built with Next.js 15, Supabase (database, sign-in, photo storage), Safepay (car
 | --- | --- |
 | Landing page, including the 3 designer templates | `src/app/page.tsx` (`#designs`) |
 | Templates and live previews | `/templates`, `/preview/[template]` |
-| Sign-in / sign-up with mobile number and SMS code | `/login` → `/login/verify` |
+| Sign-in / sign-up with mobile number only | `/login`, `src/app/api/login`, `src/lib/phoneAccount.ts` |
 | Premium page and card payments | `/premium`, `src/app/api/pay/*`, `src/lib/safepay.ts` |
 | Drag-and-drop designer (Premium) | `/design/[id]`, `src/components/canvas/*` |
 | Dashboard, editor, RSVP list, CSV export | `/dashboard/...` |
@@ -33,15 +33,18 @@ after Safepay confirms the payment.
 2. **SQL Editor** → paste the whole of `supabase/schema.sql` → **Run**. Safe to run again on an existing project.
 3. **Project Settings → API**: copy the **Project URL**, the **anon public** key and the **service_role** key (keep this one secret).
 
-### Sign-in with mobile number + SMS code
+### Sign-in with mobile number only
 
-Users sign in (and sign up) with their mobile number only. Supabase sends the code by SMS through
-a provider you pay for; Twilio is the usual choice for Pakistani numbers.
+Users type their mobile number and are signed in straight away: no SMS code, no email link, no
+password, and no SMS provider to set up. Nothing to configure in Supabase for this.
 
-4. Create a Twilio account (twilio.com). Copy the **Account SID**, **Auth Token**, and a sending number
-   or **Messaging Service SID**.
-5. Supabase → **Authentication → Sign In / Providers → Phone**: enable it, choose **Twilio**, paste the values, save.
-6. Optional: **Authentication → Providers → Email** can be switched off, since the site no longer uses it.
+How it works: the server (`/api/login`) opens an internal Supabase account for each number, with a
+placeholder email that is never emailed and a password derived from the number with
+`SUPABASE_SERVICE_ROLE_KEY`. Keep **Authentication → Providers → Email** switched on (it is by default).
+If you ever rotate the service_role key, existing users are re-synced on their next sign-in automatically.
+
+**Important:** nothing proves the person owns the number. Anyone who types a number can open
+that account, including its invitations, RSVP lists and Premium. Add an SMS code or a PIN later if that matters.
 
 Numbers can be typed as `0300 1234567`, `3001234567`, `+92 300 1234567` or `923001234567`.
 
@@ -85,7 +88,7 @@ Import the repository, then add these **Environment Variables** (all are describ
 | `SAFEPAY_API_KEY`, `SAFEPAY_SECRET_KEY` | from Safepay → Developer |
 
 Then in Supabase **Authentication → URL Configuration**, set **Site URL** to your Vercel address.
-(Redirect URLs are not needed: sign-in uses SMS codes, not links.)
+(Redirect URLs are not needed: sign-in uses no links.)
 
 ## The drag-and-drop designer
 
@@ -105,7 +108,7 @@ Open it from the home page (**Design every detail yourself** → **Customise thi
 cp .env.example .env.local   # fill in the values; PAYMENT_MODE=demo to test without Safepay keys
 npm install
 npm run dev
-npm test                      # unit tests: phone parsing, Safepay signatures, payment rules, designer validation
+npm test                      # unit tests: phone parsing and sign-in accounts, Safepay signatures, payment rules, designer validation
 ```
 
 Database security tests (on a throwaway local PostgreSQL, never your Supabase project):

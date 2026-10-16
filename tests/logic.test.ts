@@ -4,7 +4,8 @@ import { createElement, MAX_ELEMENTS, MAX_TEXT, safeImageUrl, sanitizeCanvas } f
 import { CANVAS_TEMPLATES } from '../src/lib/canvasTemplates'
 import { checkoutUrl, verifyRedirectSignature, verifyWebhookSignature } from '../src/lib/safepay'
 import { createHmac } from 'node:crypto'
-import { normalizePhone, parsePhone } from '../src/lib/identity'
+import { normalizePhone, parsePhone, safeNext } from '../src/lib/identity'
+import { accountEmail, accountPassword, ensureAccount } from '../src/lib/phoneAccount'
 
 test('Pakistani numbers normalise to E.164', () => {
   for (const v of ['03001234567', '0300 1234567', '0300-1234567', '3001234567', '923001234567', '+92 300 1234567', '00923001234567'])
@@ -19,6 +20,42 @@ test('sign-in accepts mobile numbers only', () => {
   assert.ok('error' in parsePhone('me@example.com'), 'email rejected')
   assert.ok('error' in parsePhone('12345'))
   assert.ok('error' in parsePhone(''))
+})
+
+test('number sign-in: one stable internal account per number', () => {
+  process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-service-key'
+  assert.equal(accountEmail('+923001234567'), 'p923001234567@phone.dawatnama.app')
+  const a = accountPassword('+923001234567')
+  assert.equal(a, accountPassword('+923001234567'), 'same number, same password')
+  assert.notEqual(a, accountPassword('+923001234568'), 'different number, different password')
+  assert.match(a, /^Dw#[0-9a-f]{64}Z9$/)
+  process.env.SUPABASE_SERVICE_ROLE_KEY = 'rotated'
+  assert.notEqual(a, accountPassword('+923001234567'), 'derived from the server secret')
+})
+
+test('number sign-in: new number creates an account, known number is re-synced', async () => {
+  process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-service-key'
+  const calls: string[] = []
+  const users = [{ id: 'u-old', email: undefined, phone: '923001234567', user_metadata: { full_name: 'Sara' } }]
+  const fake = (exists: boolean) => ({ auth: { admin: {
+    createUser: async (a: { email: string }) => { calls.push('create ' + a.email); return { error: exists ? { message: 'Phone number already registered' } : null } },
+    listUsers: async () => ({ data: { users }, error: null }),
+    updateUserById: async (id: string, a: { email: string; user_metadata: object }) => { calls.push(`update ${id} ${a.email} ${JSON.stringify(a.user_metadata)}`); return { error: null } },
+  } } }) as never
+  const fresh = await ensureAccount(fake(false), '+923007654321', 'Ali')
+  assert.deepEqual(fresh, { email: 'p923007654321@phone.dawatnama.app', password: accountPassword('+923007654321') })
+  assert.deepEqual(calls, ['create p923007654321@phone.dawatnama.app'])
+  calls.length = 0
+  await ensureAccount(fake(true), '+923001234567')
+  assert.equal(calls[1], 'update u-old p923001234567@phone.dawatnama.app {"full_name":"Sara","phone":"+923001234567"}')
+})
+
+test('after sign-in, only same-site paths are followed', () => {
+  assert.equal(safeNext('/design/abc'), '/design/abc')
+  assert.equal(safeNext('//evil.com'), '/dashboard')
+  assert.equal(safeNext('https://evil.com'), '/dashboard')
+  assert.equal(safeNext('/\\evil.com'), '/dashboard')
+  assert.equal(safeNext(undefined), '/dashboard')
 })
 
 test('safepay: checkout URL carries the tracker, order and return URLs', () => {

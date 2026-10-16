@@ -199,12 +199,6 @@ th { font-size: .75rem; text-transform: uppercase; letter-spacing: .08em; color:
 }
 
 /* ---- One-time code screen ---- */
-.otp { border: 0; padding: 0; display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: .5rem; }
-.otp input { text-align: center; font: 600 1.5rem/1 'Poppins', sans-serif; padding: .6em 0; border-radius: 12px; border-width: 1.5px; caret-color: var(--gold); }
-.otp input:focus { border-color: var(--gold); outline: none; box-shadow: 0 0 0 3px #b8892b33; }
-.otp:disabled input { opacity: .6; }
-.otp-to { text-align: center; margin: 0; }
-.otp-links { display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap; font-size: .9rem; }
 .otp-done { display: grid; justify-items: center; gap: .3rem; margin-top: 1.5rem; }
 .otp-done span { display: grid; place-items: center; width: 4rem; height: 4rem; border-radius: 50%; background: var(--green); color: var(--gold); font-size: 2rem; animation: pop .4s ease-out; }
 @keyframes pop { from { transform: scale(.4); opacity: 0; } }

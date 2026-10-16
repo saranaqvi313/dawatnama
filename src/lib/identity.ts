@@ -33,4 +33,7 @@ export function parsePhone(raw: string): Phone | { error: string } {
   return { value: phone, display }
 }
 
-export const OTP_LENGTH = Math.min(10, Math.max(6, Number(process.env.NEXT_PUBLIC_OTP_LENGTH) || 6))
+/** Only same-site paths are allowed after sign-in. */
+export function safeNext(raw: string | null | undefined) {
+  return raw && raw.startsWith('/') && !raw.startsWith('//') && !raw.startsWith('/\\') ? raw : '/dashboard'
+}

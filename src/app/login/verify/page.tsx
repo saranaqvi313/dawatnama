@@ -1,17 +1,6 @@
-import Nav from '@/components/Nav'
-import OtpScreen from '@/components/OtpScreen'
-import { OTP_LENGTH } from '@/lib/identity'
+import { redirect } from 'next/navigation'
 
-export const metadata = { title: 'Enter your code — Dawatnama' }
-
+// Codes are no longer used; old links land on the normal sign-in page.
 export default function Verify() {
-  return (
-    <>
-      <Nav />
-      <section className="auth">
-        <h1>Sign in</h1>
-        <OtpScreen length={OTP_LENGTH} />
-      </section>
-    </>
-  )
+  redirect('/login')
 }
