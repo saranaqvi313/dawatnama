@@ -1,5 +1,5 @@
-/** Hands the phone/email from the sign-in screen to the code screen (same tab only). */
-export type PendingLogin = { kind: 'phone' | 'email'; value: string; display: string; next: string; sentAt: number }
+/** Hands the phone number from the sign-in screen to the code screen (same tab only). */
+export type PendingLogin = { value: string; display: string; next: string; sentAt: number }
 
 const KEY = 'dawatnama-pending-login'
 
@@ -10,7 +10,7 @@ export function savePending(p: PendingLogin) {
 export function loadPending(): PendingLogin | null {
   try {
     const p = JSON.parse(sessionStorage.getItem(KEY) || 'null') as PendingLogin | null
-    if (!p || (p.kind !== 'phone' && p.kind !== 'email') || typeof p.value !== 'string') return null
+    if (!p || typeof p.value !== 'string' || !p.value.startsWith('+')) return null
     return { ...p, next: safeNext(p.next) }
   } catch { return null }
 }

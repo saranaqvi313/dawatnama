@@ -9,7 +9,7 @@ Built with Next.js 15, Supabase (database, sign-in, photo storage), Safepay (car
 | --- | --- |
 | Landing page, including the 3 designer templates | `src/app/page.tsx` (`#designs`) |
 | Templates and live previews | `/templates`, `/preview/[template]` |
-| Sign-in with a one-time code (phone or email, no links) | `/login` → `/login/verify` |
+| Sign-in / sign-up with mobile number and SMS code | `/login` → `/login/verify` |
 | Premium page and card payments | `/premium`, `src/app/api/pay/*`, `src/lib/safepay.ts` |
 | Drag-and-drop designer (Premium) | `/design/[id]`, `src/components/canvas/*` |
 | Dashboard, editor, RSVP list, CSV export | `/dashboard/...` |
@@ -33,25 +33,15 @@ after Safepay confirms the payment.
 2. **SQL Editor** → paste the whole of `supabase/schema.sql` → **Run**. Safe to run again on an existing project.
 3. **Project Settings → API**: copy the **Project URL**, the **anon public** key and the **service_role** key (keep this one secret).
 
-### Sign-in with a code, not a link
+### Sign-in with mobile number + SMS code
 
-4. **Authentication → Emails → Templates → Magic Link**: replace the body with the code only, for example:
+Users sign in (and sign up) with their mobile number only. Supabase sends the code by SMS through
+a provider you pay for; Twilio is the usual choice for Pakistani numbers.
 
-   ```html
-   <h2>Your Dawatnama code</h2>
-   <p>Enter this code to sign in: <strong>{{ .Token }}</strong></p>
-   <p>It expires in 1 hour. If you didn't ask for it, ignore this email.</p>
-   ```
-
-   Do the same for **Confirm signup** (first-time users get that template). Without this step Supabase also puts a link in the email.
-5. **Authentication → Emails → SMTP Settings**: add your own sender (for example Resend). The built-in sender only allows a few emails per hour.
-
-### Phone numbers (optional)
-
-Supabase supports phone sign-in, but it sends SMS through a provider you pay for. Twilio is the usual choice for Pakistani numbers.
-
-6. **Authentication → Providers → Phone**: enable it, choose **Twilio** (or Twilio Verify / MessageBird / Vonage) and enter its credentials.
-7. Set `NEXT_PUBLIC_PHONE_LOGIN=on`. Until you do, the sign-in screen asks for email only.
+4. Create a Twilio account (twilio.com). Copy the **Account SID**, **Auth Token**, and a sending number
+   or **Messaging Service SID**.
+5. Supabase → **Authentication → Sign In / Providers → Phone**: enable it, choose **Twilio**, paste the values, save.
+6. Optional: **Authentication → Providers → Email** can be switched off, since the site no longer uses it.
 
 Numbers can be typed as `0300 1234567`, `3001234567`, `+92 300 1234567` or `923001234567`.
 
@@ -89,14 +79,13 @@ Import the repository, then add these **Environment Variables** (all are describ
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | anon public key |
 | `SUPABASE_SERVICE_ROLE_KEY` | service_role key (secret) |
 | `NEXT_PUBLIC_SITE_URL` | e.g. `https://dawatnama.vercel.app` |
-| `NEXT_PUBLIC_PHONE_LOGIN` | `on` once SMS is set up, otherwise `off` |
 | `PREMIUM_PRICE_PKR`, `NEXT_PUBLIC_PREMIUM_PRICE_PKR` | `1499` |
 | `PAYMENT_MODE` | `card` (or `demo` on Preview deployments) |
 | `SAFEPAY_ENV` | `sandbox`, later `production` |
 | `SAFEPAY_API_KEY`, `SAFEPAY_SECRET_KEY` | from Safepay → Developer |
 
 Then in Supabase **Authentication → URL Configuration**, set **Site URL** to your Vercel address.
-(Redirect URLs are no longer needed: sign-in uses codes, not links.)
+(Redirect URLs are not needed: sign-in uses SMS codes, not links.)
 
 ## The drag-and-drop designer
 

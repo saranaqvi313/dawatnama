@@ -25,7 +25,7 @@ export default function OtpScreen({ length }: { length: number }) {
   if (pending === null)
     return (
       <div className="auth-form">
-        <p className="muted">Your sign-in session has ended. Please enter your phone number or email again.</p>
+        <p className="muted">Your sign-in session has ended. Please enter your mobile number again.</p>
         <Link href="/login" className="btn">Back to sign in</Link>
       </div>
     )
@@ -37,9 +37,7 @@ export default function OtpScreen({ length }: { length: number }) {
     if (code.length !== length || state !== 'idle') return
     setState('checking'); setError(''); setInfo('')
     const supabase = createClient()
-    const { error } = p.kind === 'phone'
-      ? await supabase.auth.verifyOtp({ phone: p.value, token: code, type: 'sms' })
-      : await supabase.auth.verifyOtp({ email: p.value, token: code, type: 'email' })
+    const { error } = await supabase.auth.verifyOtp({ phone: p.value, token: code, type: 'sms' })
     if (error) {
       setState('idle'); setError(friendly(error.message)); setDigits(Array(length).fill(''))
       boxes.current[0]?.focus()
@@ -80,9 +78,7 @@ export default function OtpScreen({ length }: { length: number }) {
   async function resend() {
     setError(''); setInfo('')
     const supabase = createClient()
-    const { error } = p.kind === 'phone'
-      ? await supabase.auth.signInWithOtp({ phone: p.value, options: { channel: 'sms' } })
-      : await supabase.auth.signInWithOtp({ email: p.value })
+    const { error } = await supabase.auth.signInWithOtp({ phone: p.value, options: { channel: 'sms' } })
     if (error) return setError(friendly(error.message))
     const updated = { ...p, sentAt: Date.now() }
     savePending(updated); setPending(updated); setNow(Date.now())
@@ -101,8 +97,7 @@ export default function OtpScreen({ length }: { length: number }) {
   return (
     <form className="auth-form" onSubmit={(e) => { e.preventDefault(); void verify(digits.join('')) }}>
       <p className="muted otp-to">
-        We sent a {length}-digit code to <b dir="ltr">{p.display}</b>{' '}
-        {p.kind === 'phone' ? 'by SMS.' : 'by email.'}
+        We sent a {length}-digit code by SMS to <b dir="ltr">{p.display}</b>.
       </p>
       <fieldset className="otp" aria-label="One-time code" disabled={state === 'checking'}>
         {digits.map((d, i) => (
@@ -121,7 +116,7 @@ export default function OtpScreen({ length }: { length: number }) {
           ? <span className="muted">Resend code in {wait}s</span>
           : <button type="button" className="link" onClick={resend}>Resend code</button>}
         <Link href={`/login?next=${encodeURIComponent(p.next)}`} onClick={clearPending}>
-          Use a different {p.kind === 'phone' ? 'number' : 'email'}
+          Use a different number
         </Link>
       </div>
     </form>

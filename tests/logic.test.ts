@@ -4,7 +4,7 @@ import { createElement, MAX_ELEMENTS, MAX_TEXT, safeImageUrl, sanitizeCanvas } f
 import { CANVAS_TEMPLATES } from '../src/lib/canvasTemplates'
 import { checkoutUrl, verifyRedirectSignature, verifyWebhookSignature } from '../src/lib/safepay'
 import { createHmac } from 'node:crypto'
-import { normalizePhone, parseIdentity } from '../src/lib/identity'
+import { normalizePhone, parsePhone } from '../src/lib/identity'
 
 test('Pakistani numbers normalise to E.164', () => {
   for (const v of ['03001234567', '0300 1234567', '0300-1234567', '3001234567', '923001234567', '+92 300 1234567', '00923001234567'])
@@ -13,12 +13,12 @@ test('Pakistani numbers normalise to E.164', () => {
   for (const v of ['0300123', '04212345678', '+92 42 1234567', 'hello', '']) assert.equal(normalizePhone(v), null, v)
 })
 
-test('identity: phone or email, phone only when enabled', () => {
-  assert.deepEqual(parseIdentity('Me@Example.COM ', true), { kind: 'email', value: 'me@example.com', display: 'me@example.com' })
-  assert.deepEqual(parseIdentity('0300 1234567', true), { kind: 'phone', value: '+923001234567', display: '0300 1234567' })
-  assert.ok('error' in parseIdentity('0300 1234567', false))
-  assert.ok('error' in parseIdentity('not-an-email@', true))
-  assert.ok('error' in parseIdentity('', true))
+test('sign-in accepts mobile numbers only', () => {
+  assert.deepEqual(parsePhone('0300 1234567'), { value: '+923001234567', display: '0300 1234567' })
+  assert.deepEqual(parsePhone('+92 345 7654321'), { value: '+923457654321', display: '0345 7654321' })
+  assert.ok('error' in parsePhone('me@example.com'), 'email rejected')
+  assert.ok('error' in parsePhone('12345'))
+  assert.ok('error' in parsePhone(''))
 })
 
 test('safepay: checkout URL carries the tracker, order and return URLs', () => {

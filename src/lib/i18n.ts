@@ -17,11 +17,11 @@ export const dict = {
     ],
     tplKicker: 'Templates', tplTitle: 'Choose a starting point', tplSub: 'Every template is fully customisable after you pick it.', preview: 'Preview', use: 'Use template',
     howTitle: 'Three steps',
-    steps: [['Choose a template', 'Preview any design. Sign in with your phone number or email and a one-time code.'], ['Add details and design', 'Names, events, venues, family list. Then make the card your own.'], ['Publish and share', 'Get your link, send it on WhatsApp and watch the RSVPs come in.']],
+    steps: [['Choose a template', 'Preview any design. Sign in with your mobile number and a one-time SMS code.'], ['Add details and design', 'Names, events, venues, family list. Then make the card your own.'], ['Publish and share', 'Get your link, send it on WhatsApp and watch the RSVPs come in.']],
     faqTitle: 'Questions',
     faqs: [['Is it free?', 'Creating, publishing and sharing invitations from a template is free. Customising the design (colours, fonts, animations and the drag-and-drop designer) is Premium: a one-time ' + PRICE_LABEL + ' that unlocks it for all your cards.'], ['How can I pay?', 'With any Visa or Mastercard debit or credit card, from any bank, on a secure payment page. Premium switches on as soon as the payment is confirmed.'], ['Can I change details after publishing?', 'Yes. Edit from your dashboard; the same link updates instantly.'], ['How do guests RSVP?', 'At the bottom of the card they enter their name and attendance. You see it in your dashboard and can export a CSV.'], ['Do guests need an app?', 'No. The link opens in any browser on any phone.']],
     finalTitle: 'Your celebration starts with the invitation.', footer: 'Made in Pakistan',
-    loginTitle: 'Sign in or sign up', loginSubPhone: 'Use your mobile number or email. We will send you a one-time code. No password needed.', loginSubEmail: 'Enter your email. We will send you a one-time code. No password needed.',
+    loginTitle: 'Sign in or sign up', loginSub: 'Enter your mobile number. We will send you a one-time code by SMS. No password needed.',
     myInvites: 'My invitations', newInvite: 'New invitation', empty: 'You have no invitations yet. Pick a template to begin.', edit: 'Edit', guests: 'RSVPs', view: 'View', live: 'Live', draft: 'Draft', del: 'Delete',
   },
 }
