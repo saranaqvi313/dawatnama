@@ -76,7 +76,7 @@ How it works:
 - Premium switches on only if the signature is valid **and** it is for the payment we created for that order.
 - The webhook does the same check, so Premium still switches on if the customer never comes back.
 
-**No Safepay keys yet?** Set `PAYMENT_MODE=demo` to try the whole flow with a test checkout (no money moves).
+**No Safepay keys yet?** Set `PAYMENT_METHOD=demo` to try the whole flow with a test checkout (no money moves).
 Demo mode is ignored on Vercel's production deployment, so it can never give Premium away on the live site.
 
 ## 3. Deploy on Vercel
@@ -91,7 +91,7 @@ Import the repository, then add these **Environment Variables** (all are describ
 | `NEXT_PUBLIC_SITE_URL` | e.g. `https://dawatnama.vercel.app` |
 | `NEXT_PUBLIC_PHONE_LOGIN` | `on` once SMS is set up, otherwise `off` |
 | `PREMIUM_PRICE_PKR`, `NEXT_PUBLIC_PREMIUM_PRICE_PKR` | `1499` |
-| `PAYMENT_MODE` | `card` (or `demo` on Preview deployments) |
+| `PAYMENT_METHOD` | `card` (or `demo` on Preview deployments) |
 | `SAFEPAY_ENV` | `sandbox`, later `production` |
 | `SAFEPAY_API_KEY`, `SAFEPAY_SECRET_KEY` | from Safepay → Developer |
 
@@ -113,7 +113,7 @@ Open it from the home page (**Design every detail yourself** → **Customise thi
 ## Run locally
 
 ```bash
-cp .env.example .env.local   # fill in the values; PAYMENT_MODE=demo to test without Safepay keys
+cp .env.example .env.local   # fill in the values; PAYMENT_METHOD=demo to test without Safepay keys
 npm install
 npm run dev
 npm test                      # unit tests: phone parsing, Safepay signatures, payment rules, designer validation
