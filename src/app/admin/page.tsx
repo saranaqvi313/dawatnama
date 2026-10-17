@@ -1,19 +1,38 @@
 import { notFound } from 'next/navigation'
 import Nav from '@/components/Nav'
 import SubmitButton from '@/components/SubmitButton'
-import { currentAdmin } from '@/lib/admin'
+import { adminState } from '@/lib/admin'
 import { rupees } from '@/lib/pricing'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { clearErrors, grantToUser } from './actions'
+import { clearErrors, grantToUser, unlockAdmin } from './actions'
 
 export const metadata = { title: 'Admin — Dawatnama', robots: { index: false } }
 export const dynamic = 'force-dynamic'
 
 const when = (iso?: string | null) => (iso ? new Date(iso).toLocaleString('en-GB', { timeZone: 'Asia/Karachi', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—')
 
-export default async function AdminPage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
-  if (!(await currentAdmin())) notFound()
-  const tab = (await searchParams).tab ?? 'overview'
+export default async function AdminPage({ searchParams }: { searchParams: Promise<{ tab?: string; wrong?: string }> }) {
+  const sp = await searchParams
+  const { state } = await adminState()
+  if (state === 'no') notFound()
+  if (state !== 'ok') return (
+    <>
+      <Nav />
+      <section className="auth">
+        <h1>Admin</h1>
+        {state === 'no-password' ? (
+          <p className="err">Set ADMIN_PASSWORD in Vercel → Settings → Environment Variables, then redeploy. The admin page stays closed until then.</p>
+        ) : (
+          <form action={unlockAdmin} className="auth-form">
+            <label>Admin password<input name="password" type="password" required autoComplete="current-password" /></label>
+            <SubmitButton className="btn">Open admin</SubmitButton>
+            {sp.wrong && <p className="err" role="alert">Wrong password.</p>}
+          </form>
+        )}
+      </section>
+    </>
+  )
+  const tab = sp.tab ?? 'overview'
   const admin = createAdminClient()
   const count = async (t: string, f?: (q: ReturnType<ReturnType<typeof admin.from>['select']>) => unknown) => {
     let q = admin.from(t).select('*', { count: 'exact', head: true })

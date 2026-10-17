@@ -1,6 +1,7 @@
 'use server'
 import { revalidatePath } from 'next/cache'
-import { currentAdmin } from '@/lib/admin'
+import { adminState, currentAdmin, passwordMatches, setAdminUnlocked } from '@/lib/admin'
+import { redirect } from 'next/navigation'
 import { createAdminClient } from '@/lib/supabase/admin'
 
 /** Support tool: add guest links (or Premium) to a user's account, e.g. after a payment problem. */
@@ -26,4 +27,14 @@ export async function clearErrors() {
   if (!(await currentAdmin())) throw new Error('Not allowed')
   await createAdminClient().from('error_logs').delete().lt('created_at', new Date().toISOString())
   revalidatePath('/admin')
+}
+
+/** Second step for admins while SMS codes are off: the ADMIN_PASSWORD. */
+export async function unlockAdmin(formData: FormData) {
+  const { state, user } = await adminState()
+  if (state !== 'locked' || !user) redirect('/admin')
+  await new Promise((r) => setTimeout(r, 600)) // slow down guessing
+  if (!passwordMatches(String(formData.get('password') ?? ''))) redirect('/admin?wrong=1')
+  await setAdminUnlocked(user.id)
+  redirect('/admin')
 }

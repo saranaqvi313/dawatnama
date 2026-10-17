@@ -16,7 +16,7 @@ async function post(url: string, body: unknown) {
  * Sign in or sign up: mobile number, then the 6-digit code sent by SMS. Every sign-in needs a
  * fresh code. New numbers get an account on their first sign-in.
  */
-export default function LoginForm({ next }: { next: string }) {
+export default function LoginForm({ next, otp = false }: { next: string; otp?: boolean }) {
   const [step, setStep] = useState<'phone' | 'code' | 'done'>('phone')
   const [phone, setPhone] = useState<{ value: string; display: string } | null>(null)
   const [name, setName] = useState('')
@@ -31,10 +31,15 @@ export default function LoginForm({ next }: { next: string }) {
   useEffect(() => { const id = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(id) }, [])
   useEffect(() => { if (step === 'code') boxes.current[0]?.focus() }, [step])
 
-  async function send(target: { value: string; display: string }) {
+  async function send(target: { value: string; display: string }, typedName = name) {
     setBusy(true); setError(''); setInfo('')
     try {
-      const data = await post('/api/login', { phone: target.value })
+      const data = await post('/api/login', { phone: target.value, name: typedName, next })
+      if (data.next) {  // codes are off: already signed in
+        setStep('done')
+        window.setTimeout(() => window.location.assign(data.next || '/dashboard'), 500)
+        return
+      }
       setPhone(target); setStep('code'); setSentAt(Date.now()); setDigits(Array(LENGTH).fill(''))
       if (data.demoCode) setInfo(`Test mode (no SMS sent): your code is ${data.demoCode}`)
     } catch (e) { setError((e as Error).message) }
@@ -46,8 +51,9 @@ export default function LoginForm({ next }: { next: string }) {
     const f = new FormData(e.currentTarget)
     const p = parsePhone(String(f.get('phone') || ''))
     if ('error' in p) return setError(p.error)
-    setName(String(f.get('name') || '').trim())
-    void send(p)
+    const n = String(f.get('name') || '').trim()
+    setName(n)
+    void send(p, n)
   }
 
   async function verify(code: string) {
@@ -121,8 +127,8 @@ export default function LoginForm({ next }: { next: string }) {
       <label>Mobile number
         <input name="phone" type="tel" required autoComplete="tel" inputMode="tel" placeholder="0300 1234567" dir="ltr" defaultValue={phone?.display} />
       </label>
-      <button className="btn" disabled={busy} aria-busy={busy}>Send code</button>
-      <p className="muted small-note">We&apos;ll text you a 6-digit code. New here? Your account is created when you sign in.</p>
+      <button className="btn" disabled={busy} aria-busy={busy}>{otp ? 'Send code' : 'Continue'}</button>
+      <p className="muted small-note">{otp ? 'We\'ll text you a 6-digit code. ' : ''}New here? Your account is created when you sign in.</p>
       {error && <p className="err" role="alert">{error}</p>}
     </form>
   )

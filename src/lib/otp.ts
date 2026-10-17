@@ -13,10 +13,17 @@ const MAX_ATTEMPTS = 5
  *  - "textbee": your own Android phone + SIM via textbee.dev (needs TEXTBEE_API_KEY)
  *  - "demo":    no SMS; the code is shown on screen. Never allowed on the live (production) site.
  */
+/**
+ * SMS codes are switched OFF for now: sign-in works with the mobile number alone (see /api/login).
+ * To turn codes back on later, set this to true and restore the textbee lines below and in sendLoginCode.
+ */
+export const OTP_ENABLED = false
+
 export function otpProvider(): 'textbee' | 'demo' | 'off' {
+  if (!OTP_ENABLED) return 'off'
   const p = (process.env.OTP_PROVIDER || '').toLowerCase()
   if (p === 'demo' && process.env.VERCEL_ENV !== 'production') return 'demo'
-  if (p === 'textbee' && process.env.TEXTBEE_API_KEY) return 'textbee'
+  // if (p === 'textbee' && process.env.TEXTBEE_API_KEY) return 'textbee'
   return 'off'
 }
 
@@ -34,6 +41,12 @@ export function newCode() {
   return String(randomInt(0, 10 ** CODE_LENGTH)).padStart(CODE_LENGTH, '0')
 }
 
+/** Which part of sending a code failed, so the sign-in page can say what to fix. */
+export class OtpError extends Error {
+  constructor(public kind: 'setup' | 'database' | 'sms', message: string) { super(message) }
+}
+
+/* textbee SMS sending, switched off for now (OTP_ENABLED = false).
 async function sendSms(phone: string, text: string) {
   const res = await fetch('https://api.textbee.dev/api/v1/gateway/send-sms', {
     method: 'POST',
@@ -41,8 +54,9 @@ async function sendSms(phone: string, text: string) {
     body: JSON.stringify({ recipients: [phone], message: text, ...(process.env.TEXTBEE_DEVICE_ID ? { deviceId: process.env.TEXTBEE_DEVICE_ID } : {}) }),
     cache: 'no-store',
   })
-  if (!res.ok) throw new Error(`SMS service answered ${res.status}: ${(await res.text().catch(() => '')).slice(0, 200)}`)
+  if (!res.ok) throw new OtpError('sms', `textbee answered ${res.status}: ${(await res.text().catch(() => '')).slice(0, 300)}`)
 }
+*/
 
 export type SendResult = { ok: true; demoCode?: string } | { ok: false; status: number; error: string }
 
@@ -50,8 +64,10 @@ export type SendResult = { ok: true; demoCode?: string } | { ok: false; status: 
 export async function sendLoginCode(phone: string): Promise<SendResult> {
   const provider = otpProvider()
   if (provider === 'off') return { ok: false, status: 503, error: 'Sign-in codes are not set up on this site yet.' }
-  const admin = createAdminClient()
-  const { data: row } = await admin.from('login_codes').select('last_sent_at, window_start, sends_in_window').eq('phone', phone).maybeSingle()
+  let admin
+  try { admin = createAdminClient() } catch { throw new OtpError('setup', 'SUPABASE_SERVICE_ROLE_KEY is not set on the server.') }
+  const { data: row, error: readErr } = await admin.from('login_codes').select('last_sent_at, window_start, sends_in_window').eq('phone', phone).maybeSingle()
+  if (readErr) throw new OtpError('database', `login_codes table: ${readErr.message}`)
   const now = Date.now()
   if (row && now - new Date(row.last_sent_at).getTime() < RESEND_AFTER_MS) {
     return { ok: false, status: 429, error: 'Please wait a minute before asking for another code.' }
@@ -67,10 +83,10 @@ export async function sendLoginCode(phone: string): Promise<SendResult> {
     window_start: sameWindow ? row.window_start : new Date(now).toISOString(),
     last_sent_at: new Date(now).toISOString(),
   })
-  if (error) throw new Error(`Could not store code: ${error.message}`)
+  if (error) throw new OtpError('database', `Could not store code: ${error.message}`)
   if (provider === 'demo') return { ok: true, demoCode: code }
-  await sendSms(phone, `${code} is your Dawatnama sign-in code. It expires in 10 minutes. Do not share it with anyone.`)
-  return { ok: true }
+  // await sendSms(phone, `${code} is your Dawatnama sign-in code. It expires in 10 minutes. Do not share it with anyone.`)
+  return { ok: false, status: 503, error: 'Sign-in codes are switched off.' }
 }
 
 /** Checks a code. Each code works once, for 10 minutes, with at most 5 tries. */
