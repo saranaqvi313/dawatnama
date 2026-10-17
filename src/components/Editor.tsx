@@ -181,7 +181,7 @@ export default function Editor({ invitation, siteUrl, premium, sharePaid, payRes
 
           {tab === 'Share' && (
             <>
-              <LinkNameField invitationId={invitation.id} slug={slug} siteUrl={siteUrl} live={published} onSaved={setSlug} />
+              <LinkNameField invitationId={invitation.id} slug={slug} siteUrl={siteUrl} live={published} paid={sharePaid} onSaved={setSlug} />
               {published ? (
                 <>
                   <label>Your invitation link<input readOnly value={link} onFocus={(e) => e.target.select()} /></label>

@@ -3,10 +3,10 @@ import { useState } from 'react'
 import { updateSlug } from '@/app/actions'
 import { toSlug } from '@/lib/slug'
 
-type Props = { invitationId: string; slug: string; siteUrl: string; live: boolean; onSaved: (slug: string) => void }
+type Props = { invitationId: string; slug: string; siteUrl: string; live: boolean; paid: boolean; onSaved: (slug: string) => void }
 
 /** Lets the owner choose the name in the card's link: your-site.com/<name>. */
-export default function LinkNameField({ invitationId, slug, siteUrl, live, onSaved }: Props) {
+export default function LinkNameField({ invitationId, slug, siteUrl, live, paid, onSaved }: Props) {
   const [value, setValue] = useState(slug)
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
@@ -28,13 +28,15 @@ export default function LinkNameField({ invitationId, slug, siteUrl, live, onSav
     <div className="link-name">
       <label>Link name (e.g. the guest&apos;s name)
         <div className="link-name-row">
-          <span className="link-host" dir="ltr">{host}/</span>
+          {paid && <span className="link-host" dir="ltr">{host}/</span>}
           <input value={value} onChange={(e) => { setValue(e.target.value); setMsg(null) }} onBlur={() => setValue((v) => toSlug(v) || v)}
             placeholder="ali-khan" maxLength={60} dir="ltr" autoCapitalize="off" autoCorrect="off" spellCheck={false}
             onKeyDown={(e) => { if (e.key === 'Enter' && changed) { e.preventDefault(); void save() } }} />
         </div>
       </label>
-      <p className="muted small-note link-preview" dir="ltr">{host}/<b>{preview}</b></p>
+      {paid
+        ? <p className="muted small-note link-preview" dir="ltr">{host}/<b>{preview}</b></p>
+        : <p className="muted small-note">Your full link appears here after payment.</p>}
       {changed && <button type="button" className="btn ghost small" disabled={busy} aria-busy={busy} onClick={save}>Save link name</button>}
       {msg && <p className={msg.ok ? 'ok' : 'err'} role={msg.ok ? 'status' : 'alert'}>{msg.text}</p>}
     </div>

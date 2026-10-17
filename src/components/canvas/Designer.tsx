@@ -409,7 +409,7 @@ export default function Designer({ invitationId, userId, slug, siteUrl, initial,
             </>
           )}
 
-          {panel === 'share' && <LinkNameField invitationId={invitationId} slug={linkSlug} siteUrl={siteUrl} live={published} onSaved={setLinkSlug} />}
+          {panel === 'share' && <LinkNameField invitationId={invitationId} slug={linkSlug} siteUrl={siteUrl} live={published} paid={sharePaid} onSaved={setLinkSlug} />}
           {panel === 'share' && (
             published ? (
               <>
