@@ -7,6 +7,13 @@ export async function isPremium(supabase: SupabaseClient, userId: string | undef
   return Boolean(data?.is_premium)
 }
 
+/** How many unused guest-link credits the user has. */
+export async function linkCredits(supabase: SupabaseClient, userId: string | undefined | null): Promise<number> {
+  if (!userId) return 0
+  const { data } = await supabase.from('profiles').select('link_credits').eq('user_id', userId).maybeSingle()
+  return Math.max(0, Number(data?.link_credits ?? 0))
+}
+
 export function displayName(user: User): string {
   const full = String(user.user_metadata?.full_name || '').trim()
   if (full) return full

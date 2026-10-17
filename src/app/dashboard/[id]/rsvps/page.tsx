@@ -19,7 +19,7 @@ export default async function Rsvps({ params }: { params: Promise<{ id: string }
       <Nav />
       <section className="band dash">
         <div className="dash-head">
-          <div><Link href={`/dashboard/${id}`}>← Back to editor</Link><h2>RSVPs</h2></div>
+          <div><Link href={`/dashboard/${id}/guests`}>← Guest list</Link><h2>RSVPs</h2></div>
           <a className="btn ghost" href={`/dashboard/${id}/rsvps/export`}>Export CSV</a>
         </div>
         <div className="stats">
@@ -30,10 +30,10 @@ export default async function Rsvps({ params }: { params: Promise<{ id: string }
         </div>
         {rows.length === 0 ? <p className="muted">No replies yet. Share your link to start collecting RSVPs.</p> : (
           <div className="table-wrap"><table>
-            <thead><tr><th>Name</th><th>Attending</th><th>Guests</th><th>Message</th><th>Received</th></tr></thead>
+            <thead><tr><th>Name</th><th>Function</th><th>Attending</th><th>People</th><th>Message</th><th>Received</th></tr></thead>
             <tbody>
               {rows.map((r) => (
-                <tr key={r.id}><td dir="auto">{r.name}</td><td>{r.attending}</td><td>{r.guests}</td><td dir="auto">{r.message}</td><td>{new Date(r.created_at).toLocaleDateString('en-GB')}</td></tr>
+                <tr key={r.id}><td dir="auto">{r.name}</td><td dir="auto">{(r as Rsvp & { event_name?: string }).event_name ?? '—'}</td><td>{r.attending}</td><td>{r.guests}</td><td dir="auto">{r.message}</td><td>{new Date(r.created_at).toLocaleDateString('en-GB')}</td></tr>
               ))}
             </tbody>
           </table></div>

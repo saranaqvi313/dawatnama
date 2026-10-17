@@ -7,26 +7,28 @@ Built with Next.js 15, Supabase (database, sign-in, photo storage), Safepay (car
 
 | Area | Where |
 | --- | --- |
-| Landing page, including the 3 designer templates | `src/app/page.tsx` (`#designs`) |
-| Templates and live previews | `/templates`, `/preview/[template]` |
-| Sign-in / sign-up with mobile number only | `/login`, `src/app/api/login`, `src/lib/phoneAccount.ts` |
-| Premium page and card payments | `/premium`, `src/app/api/pay/*`, `src/lib/safepay.ts` |
-| Drag-and-drop designer (Premium) | `/design/[id]`, `src/components/canvas/*` |
-| Dashboard, editor, RSVP list, CSV export | `/dashboard/...` |
-| Public invitation / shared card link | `/<link-name>` (e.g. `/ali-khan`; set in the Share tab), also `/i/<link-name>` |
-| Database tables and security rules | `supabase/schema.sql` |
+| Landing page, templates, live previews | `/`, `/templates`, `/preview/[template]` |
+| Sign-in with mobile number + SMS code (every time) | `/login`, `src/app/api/login/*`, `src/lib/otp.ts` |
+| Card editor: details, functions, photos & video, design, share | `/dashboard/[id]` |
+| Fairy-tale scenes and opening effects | `src/components/Scene.tsx`, `InvitationView.tsx`, `globals.css` |
+| Guest list: Excel/CSV upload, personal links, WhatsApp invite/remind, QR, headcount per function | `/dashboard/[id]/guests` |
+| Card links and guest links (`your-site.com/ali-khan`), WhatsApp preview image | `src/app/[slug]`, `src/lib/ogImage.tsx` |
+| Plans: guest links, bundles, Shaadi package, Premium | `/premium`, `src/lib/pricing.ts`, `src/app/api/pay/*` |
+| Drag-and-drop designer (Premium) | `/design/[id]` |
+| Terms, privacy, refund policy, contact | `/terms`, `/privacy`, `/refund-policy`, `/contact` |
+| Card idea pages for Google, sitemap | `/cards/*`, `/sitemap.xml`, `/robots.txt` |
+| Admin: payments, users, cards, errors, backup download | `/admin` (numbers in `ADMIN_PHONES`) |
+| Database tables, rules and tests | `supabase/schema.sql`, `supabase/tests/*` |
 
 ## What is free and what costs money
 
-| Free | Share link (Rs 100 per card) | Premium (Rs 1,499 once, all cards) |
-| --- | --- | --- |
-| Pick a template; edit names, details, events, message, photo, family list | A link for that card to send on WhatsApp; guests open it and RSVP | Design tab: colours, fonts, artwork, opening animation, 3D effects, card style |
-| Preview the card while you edit | Pay once per card from its **Share** tab; unpublish and republish freely | Drag-and-drop designer and its design templates |
+| Free | Guest links | Premium | Shaadi package |
+| --- | --- | --- | --- |
+| Pick a template; add names, functions, photos, video; preview; guest list | Rs 100 each, 5 for Rs 400, 20 for Rs 1,400. One link = one guest's personal link, or a card's open link | Rs 1,499 once: scenes, calligraphy, openings, colours, designer | Rs 3,999: Premium + 50 links |
 
-Share links and Premium are separate payments. Both are enforced by the database
-(`enforce_share_payment` and `enforce_premium_customisation` triggers), not only by the app,
-so they cannot be bypassed with the public anon key. Only the server can unlock them, and only
-after Safepay confirms the payment. Cards that were already live before share links became paid keep working.
+All of it is enforced in the database (`enforce_share_payment`, `guard_guest`, `enforce_premium_customisation`
+triggers and the `activate_*` functions), not only in the app. Only the server can add links or Premium,
+and only after Safepay confirms the payment.
 
 ## 1. Set up Supabase
 
@@ -34,18 +36,19 @@ after Safepay confirms the payment. Cards that were already live before share li
 2. **SQL Editor** → paste the whole of `supabase/schema.sql` → **Run**. Safe to run again on an existing project.
 3. **Project Settings → API**: copy the **Project URL**, the **anon public** key and the **service_role** key (keep this one secret).
 
-### Sign-in with mobile number only
+### Sign-in codes by SMS (no Twilio needed)
 
-Users type their mobile number and are signed in straight away: no SMS code, no email link, no
-password, and no SMS provider to set up. Nothing to configure in Supabase for this.
+Every sign-in asks for a 6-digit code sent by SMS. The site sends the codes itself through
+**textbee**, which uses your own Android phone and SIM as the SMS sender (free plan: 300 SMS a month).
 
-How it works: the server (`/api/login`) opens an internal Supabase account for each number, with a
-placeholder email that is never emailed and a password derived from the number with
-`SUPABASE_SERVICE_ROLE_KEY`. Keep **Authentication → Providers → Email** switched on (it is by default).
-If you ever rotate the service_role key, existing users are re-synced on their next sign-in automatically.
+4. Put a SIM with an SMS package in an Android phone that stays on and connected to the internet.
+5. Sign up at https://textbee.dev, install the textbee app on that phone, and register the phone from the dashboard.
+6. Copy the **API key** into `TEXTBEE_API_KEY` and set `OTP_PROVIDER=textbee`.
+7. Keep **Authentication → Providers → Email** switched on in Supabase (it is by default). The phone
+   provider and Twilio are not needed.
 
-**Important:** nothing proves the person owns the number. Anyone who types a number can open
-that account, including its invitations, RSVP lists and Premium. Add an SMS code or a PIN later if that matters.
+For testing without SMS, set `OTP_PROVIDER=demo` on a Preview deployment: the code is shown on screen.
+Demo codes never work on the live (production) site.
 
 Numbers can be typed as `0300 1234567`, `3001234567`, `+92 300 1234567` or `923001234567`.
 
@@ -85,6 +88,9 @@ Import the repository, then add these **Environment Variables** (all are describ
 | `NEXT_PUBLIC_SITE_URL` | e.g. `https://dawatnama.vercel.app` |
 | `PREMIUM_PRICE_PKR`, `NEXT_PUBLIC_PREMIUM_PRICE_PKR` | `1499` |
 | `SHARE_PRICE_PKR`, `NEXT_PUBLIC_SHARE_PRICE_PKR` | `100` |
+| `OTP_PROVIDER`, `TEXTBEE_API_KEY` | `textbee`, your textbee API key |
+| `ADMIN_PHONES` | your mobile number(s), comma separated |
+| `NEXT_PUBLIC_BUSINESS_NAME`, `NEXT_PUBLIC_CONTACT_EMAIL`, `NEXT_PUBLIC_CONTACT_PHONE`, `NEXT_PUBLIC_BUSINESS_ADDRESS` | shown on Contact / Terms / Refund pages |
 | `PAYMENT_MODE` | `card` (or `demo` on Preview deployments) |
 | `SAFEPAY_ENV` | `sandbox`, later `production` |
 | `SAFEPAY_API_KEY`, `SAFEPAY_SECRET_KEY` | from Safepay → Developer |
@@ -118,7 +124,8 @@ Database security tests (on a throwaway local PostgreSQL, never your Supabase pr
 ```bash
 psql -d scratch -f supabase/tests/supabase_stub.sql
 psql -d scratch -f supabase/schema.sql
-psql -d scratch -f supabase/tests/premium_gate.sql   # 37 checks; rolls back
+psql -d scratch -f supabase/tests/premium_gate.sql   # 35 checks; rolls back
+psql -d scratch -f supabase/tests/guests_credits.sql # 42 checks; rolls back
 ```
 
 ## Security notes
@@ -127,3 +134,16 @@ psql -d scratch -f supabase/tests/premium_gate.sql   # 37 checks; rolls back
 - `SUPABASE_SERVICE_ROLE_KEY` and `SAFEPAY_SECRET_KEY` are server-only secrets. Never prefix them with `NEXT_PUBLIC_`.
 - Users can read their own Premium status and payments, but cannot write either. `complete_payment()` can only be called by the server.
 - Designer cards are validated on save and again before display (colours, fonts, image URLs must be https, size limits).
+
+## Error monitoring
+
+Errors from visitors' browsers and from the server are saved in the `error_logs` table and listed on
+`/admin` → Errors. Vercel → Logs shows the same server errors with more detail.
+
+## Backups
+
+- **Any time:** `/admin` → **Download backup (JSON)** saves every table (cards, guests, replies, payments, users).
+- **Every week, automatically:** `.github/workflows/backup.yml` dumps the whole database, encrypts it and keeps
+  it as a GitHub artifact for 90 days. Add two repository secrets first (GitHub → Settings → Secrets and
+  variables → Actions): `SUPABASE_DB_URL` (Supabase → Project Settings → Database → connection string,
+  "Session pooler", with your password) and `BACKUP_PASSPHRASE` (any long password; keep it safe).

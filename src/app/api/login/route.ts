@@ -1,26 +1,23 @@
 import { NextResponse, type NextRequest } from 'next/server'
-import { parsePhone, safeNext } from '@/lib/identity'
-import { ensureAccount } from '@/lib/phoneAccount'
+import { parsePhone } from '@/lib/identity'
+import { sendLoginCode } from '@/lib/otp'
 import { sameOrigin, siteUrl } from '@/lib/payments'
-import { createAdminClient } from '@/lib/supabase/admin'
-import { createClient } from '@/lib/supabase/server'
+import { logError } from '@/lib/errors'
 
-/** Sign in (or sign up) with a mobile number only. Sets the session cookie and returns where to go. */
+export const runtime = 'nodejs'
+
+/** Step 1 of sign-in: sends a one-time code to the mobile number. */
 export async function POST(request: NextRequest) {
   if (!sameOrigin(request, siteUrl(request.nextUrl.origin))) return NextResponse.json({ error: 'Please sign in from the Dawatnama site.' }, { status: 403 })
-  const body = (await request.json().catch(() => ({}))) as { phone?: unknown; name?: unknown; next?: unknown }
+  const body = (await request.json().catch(() => ({}))) as { phone?: unknown }
   const phone = parsePhone(String(body.phone ?? ''))
   if ('error' in phone) return NextResponse.json({ error: phone.error }, { status: 400 })
-  const name = String(body.name ?? '').trim().slice(0, 60)
-
-  const supabase = await createClient()
   try {
-    const account = await ensureAccount(createAdminClient(), phone.value, name || undefined)
-    const { error } = await supabase.auth.signInWithPassword(account)
-    if (error) throw error
+    const res = await sendLoginCode(phone.value)
+    if (!res.ok) return NextResponse.json({ error: res.error }, { status: res.status })
+    return NextResponse.json({ sent: true, demoCode: res.demoCode })
   } catch (e) {
-    console.error('number sign-in failed', e)
-    return NextResponse.json({ error: 'Could not sign you in right now. Please try again.' }, { status: 500 })
+    await logError('login-send', e, request.nextUrl.pathname)
+    return NextResponse.json({ error: 'Could not send the code right now. Please try again in a minute.' }, { status: 502 })
   }
-  return NextResponse.json({ next: safeNext(String(body.next ?? '')) })
 }

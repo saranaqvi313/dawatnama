@@ -150,3 +150,71 @@ test('card links: your-site.com/<guest-name>', () => {
   assert.ok(!isPossibleSlug('favicon.ico'))
   assert.ok(!isPossibleSlug('templates'))
 })
+
+import { parseCsv, rowsToGuests } from '../src/lib/sheet'
+import { guestStats, replySummary, whatsappHref, type GuestRow } from '../src/lib/guestStats'
+import { videoEmbed } from '../src/lib/media'
+import { PRODUCTS, serverPriceOf } from '../src/lib/pricing'
+import { hashCode, newCode } from '../src/lib/otp'
+import { safeReturn, withResult } from '../src/lib/payments'
+
+test('guest list upload: CSV with headers in any order', () => {
+  const rows = parseCsv('﻿Phone,Full Name,Guests,Events\r\n0300 1234567,"Khan, Ali",3,"Mehndi, Baraat"\r\n,Hina,,\r\n')
+  assert.deepEqual(rowsToGuests(rows), [
+    { name: 'Khan, Ali', phone: '0300 1234567', party_size: 3, events: ['Mehndi', 'Baraat'] },
+    { name: 'Hina', phone: '', party_size: 1, events: [] },
+  ])
+  // no header row: A = name, B = phone, C = people; semicolons (Excel in some locales) work too
+  assert.deepEqual(rowsToGuests(parseCsv('Ali;03001234567;2\nSara;;\n')).map((g) => [g.name, g.party_size]), [['Ali', 2], ['Sara', 1]])
+})
+
+test('guest dashboard: food headcount per function and who opened', () => {
+  const g = (id: string, events: string[], live = true, opens = 0): GuestRow => ({ id, name: id, phone: null, slug: id, party_size: 3, events, link_active: live, open_count: opens, opened_at: null, last_opened_at: null, reminded_at: null })
+  const guests = [g('a', []), g('b', ['Mehndi'], true, 2), g('c', ['Baraat'], false)]
+  const replies = [
+    { guest_id: 'a', event_name: 'Mehndi', attending: 'yes' as const, guests: 3 },
+    { guest_id: 'a', event_name: 'Baraat', attending: 'no' as const, guests: 0 },
+    { guest_id: null, event_name: 'Mehndi', attending: 'yes' as const, guests: 2 },
+  ]
+  const s = guestStats(guests, replies, ['Mehndi', 'Baraat'])
+  assert.equal(s.live, 2); assert.equal(s.opened, 1); assert.equal(s.replied, 1); assert.equal(s.people, 9)
+  assert.deepEqual(s.perEvent.map((e) => [e.event, e.coming, e.declined, e.waiting]), [['Mehndi', 5, 0, 1], ['Baraat', 0, 1, 0]])
+  assert.equal(replySummary('a', replies), 'Mehndi: coming (3) · Baraat: can\'t come')
+  assert.equal(whatsappHref('+92 300 1234567', 'Hi & bye'), 'https://wa.me/923001234567?text=Hi%20%26%20bye')
+})
+
+test('video links: YouTube, Vimeo, uploaded files; nothing else', () => {
+  assert.equal(videoEmbed('https://youtu.be/dQw4w9WgXcQ')?.src, 'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ?rel=0')
+  assert.equal(videoEmbed('https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=3')?.kind, 'iframe')
+  assert.equal(videoEmbed('https://youtube.com/shorts/abcDEF12345')?.src, 'https://www.youtube-nocookie.com/embed/abcDEF12345?rel=0')
+  assert.equal(videoEmbed('https://vimeo.com/123456789')?.src, 'https://player.vimeo.com/video/123456789')
+  assert.equal(videoEmbed('https://x.supabase.co/storage/v1/object/public/photos/u/v.mp4')?.kind, 'file')
+  assert.equal(videoEmbed('http://youtu.be/dQw4w9WgXcQ'), null)
+  assert.equal(videoEmbed('javascript:alert(1)'), null)
+  assert.equal(videoEmbed('https://evil.example/page'), null)
+})
+
+test('prices: bundles are cheaper per link and the server decides the amount', () => {
+  assert.equal(PRODUCTS.links1.price, 100)
+  assert.ok(PRODUCTS.links5.price / PRODUCTS.links5.credits < PRODUCTS.links1.price)
+  assert.ok(PRODUCTS.links20.price / PRODUCTS.links20.credits < PRODUCTS.links5.price / PRODUCTS.links5.credits)
+  assert.ok(PRODUCTS.shaadi.price < PRODUCTS.premium.price + PRODUCTS.links1.price * PRODUCTS.shaadi.credits)
+  assert.equal(serverPriceOf('premium'), 1499)
+})
+
+test('sign-in codes: 6 digits, hashed per number, never stored plain', () => {
+  process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-service-key'
+  for (let i = 0; i < 50; i++) assert.match(newCode(), /^\d{6}$/)
+  assert.equal(hashCode('+923001234567', '123456'), hashCode('+923001234567', '123456'))
+  assert.notEqual(hashCode('+923001234567', '123456'), hashCode('+923001234568', '123456'))
+  assert.ok(!hashCode('+923001234567', '123456').includes('123456'))
+})
+
+test('after paying, only same-site return paths are used', () => {
+  assert.equal(safeReturn('/dashboard/abc/guests'), '/dashboard/abc/guests')
+  assert.equal(safeReturn('//evil.com'), null)
+  assert.equal(safeReturn('https://evil.com'), null)
+  assert.equal(safeReturn('/\\evil.com'), null)
+  assert.equal(withResult('/dashboard/abc', 'paid'), '/dashboard/abc?pay=paid')
+  assert.equal(withResult('/x?y=1', 'paid'), '/x?y=1&pay=paid')
+})

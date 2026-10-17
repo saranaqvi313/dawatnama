@@ -17,11 +17,11 @@ export const dict = {
     ],
     tplKicker: 'Templates', tplTitle: 'Choose a starting point', tplSub: 'Every template is fully customisable after you pick it.', preview: 'Preview', use: 'Use template',
     howTitle: 'Three steps',
-    steps: [['Choose a template', 'Preview any design. Sign in with just your mobile number.'], ['Add details and design', 'Names, events, venues, family list. Then make the card your own.'], ['Get your link and share', 'Get your card\'s link for ' + SHARE_PRICE_LABEL + ', send it on WhatsApp and watch the RSVPs come in.']],
+    steps: [['Choose a template', 'Preview any design. Sign in with your mobile number and a text code.'], ['Add details and design', 'Names, events, venues, family list. Then make the card your own.'], ['Get your link and share', 'Get your card\'s link for ' + SHARE_PRICE_LABEL + ', send it on WhatsApp and watch the RSVPs come in.']],
     faqTitle: 'Questions',
     faqs: [['What does it cost?', 'Creating a card and adding your details and events is free. Each card\'s share link is ' + SHARE_PRICE_LABEL + ', paid once per card. Customising the design (colours, fonts, animations and the drag-and-drop designer) is Premium: a one-time ' + PRICE_LABEL + ' that unlocks it for all your cards. The two are separate.'], ['How can I pay?', 'With any Visa or Mastercard debit or credit card, from any bank, on a secure payment page. Premium or your link switches on as soon as the payment is confirmed.'], ['Can I change details after publishing?', 'Yes. Edit from your dashboard; the same link updates instantly.'], ['How do guests RSVP?', 'At the bottom of the card they enter their name and attendance. You see it in your dashboard and can export a CSV.'], ['Do guests need an app?', 'No. The link opens in any browser on any phone.']],
     finalTitle: 'Your celebration starts with the invitation.', footer: 'Made in Pakistan',
-    loginTitle: 'Sign in or sign up', loginSub: 'Enter your mobile number to continue. No code, no password.',
+    loginTitle: 'Sign in or sign up', loginSub: 'Enter your mobile number. We will text you a code to sign in. No password needed.',
     myInvites: 'My invitations', newInvite: 'New invitation', empty: 'You have no invitations yet. Pick a template to begin.', edit: 'Edit', guests: 'RSVPs', view: 'View', live: 'Live', draft: 'Draft', del: 'Delete',
   },
 }
@@ -30,7 +30,7 @@ export type Dict = typeof dict.en
 
 /** Labels shown on the invitation card itself (follows the card's language). */
 export const cardText = {
-  en: { bismillah: 'In the name of Allah, the Most Gracious, the Most Merciful', open: 'Tap to open', and: '&', invite: 'request the pleasure of your company', schedule: 'Events', directions: 'Directions', calendar: 'Add to calendar', countdown: 'Counting down', days: 'Days', hours: 'Hours', mins: 'Minutes', secs: 'Seconds', family: 'Awaiting your arrival', rsvp: 'Will you join us?', name: 'Your name', yes: 'Yes, coming', no: 'Sorry, cannot', maybe: 'Maybe', guests: 'Number of guests', note: 'A message (optional)', send: 'Send RSVP', thanks: 'Thank you! Your reply has been sent.', error: 'Could not send. Please try again.', demo: 'RSVP opens once this invitation is published.', made: 'Made with Dawatnama' },
+  en: { bismillah: 'In the name of Allah, the Most Gracious, the Most Merciful', open: 'Tap to open', and: '&', invite: 'request the pleasure of your company', schedule: 'Events', directions: 'Directions', calendar: 'Add to calendar', countdown: 'Counting down', days: 'Days', hours: 'Hours', mins: 'Minutes', secs: 'Seconds', family: 'Awaiting your arrival', rsvp: 'Will you join us?', name: 'Your name', yes: 'Yes, coming', no: 'Sorry, cannot', maybe: 'Maybe', guests: 'Number of guests', note: 'A message (optional)', send: 'Send RSVP', thanks: 'Thank you! Your reply has been sent.', error: 'Could not send. Please try again.', demo: 'RSVP opens once this invitation is published.', made: 'Made with Dawatnama · make your own' },
 }
 
 export function asLang(_v?: string | null): Lang {

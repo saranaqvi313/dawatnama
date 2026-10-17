@@ -7,16 +7,38 @@ import { sanitizeCanvas } from '@/lib/canvas'
 import { getCanvasTemplate } from '@/lib/canvasTemplates'
 import { slugProblem, toSlug } from '@/lib/slug'
 
-export async function submitRsvp(input: { invitationId: string; name: string; attending: string; guests: number; message: string }) {
-  const name = input.name.trim().slice(0, 80)
-  const attending = ['yes', 'no', 'maybe'].includes(input.attending) ? input.attending : 'yes'
-  const guests = attending === 'no' ? 0 : Math.min(20, Math.max(1, Math.floor(Number(input.guests) || 1)))
+export type RsvpRow = { event?: string; attending: string; guests: number }
+
+/**
+ * RSVP from the card's open link: one row per function. Guests with a personal link reply
+ * through submitGuestRsvp instead.
+ */
+export async function submitRsvp(input: { invitationId: string; name: string; message: string; rows?: RsvpRow[]; attending?: string; guests?: number }) {
+  const name = String(input.name ?? '').trim().slice(0, 80)
   if (!name || !input.invitationId) return { ok: false }
+  const rows = (input.rows?.length ? input.rows : [{ attending: input.attending ?? 'yes', guests: input.guests ?? 1 }]).slice(0, 20)
+  const message = String(input.message ?? '').trim().slice(0, 500) || null
   const supabase = await createClient()
-  const { error } = await supabase.from('rsvps').insert({
-    invitation_id: input.invitationId, name, attending, guests, message: input.message.trim().slice(0, 500) || null,
-  })
+  const { error } = await supabase.from('rsvps').insert(rows.map((r) => {
+    const attending = ['yes', 'no', 'maybe'].includes(r.attending) ? r.attending : 'yes'
+    return {
+      invitation_id: input.invitationId, name, message, attending,
+      guests: attending === 'no' ? 0 : Math.min(20, Math.max(1, Math.floor(Number(r.guests) || 1))),
+      event_name: r.event ? String(r.event).slice(0, 80) : null,
+    }
+  }))
   return { ok: !error }
+}
+
+/** RSVP through a guest's personal link (replying again replaces the earlier reply). */
+export async function submitGuestRsvp(input: { slug: string; message: string; rows: RsvpRow[] }) {
+  const supabase = await createClient()
+  const { data, error } = await supabase.rpc('submit_guest_rsvp', {
+    p_slug: String(input.slug ?? '').slice(0, 80),
+    p_rows: (input.rows ?? []).slice(0, 20).map((r) => ({ event: r.event ?? '', attending: r.attending, guests: Number(r.guests) || 1 })),
+    p_message: String(input.message ?? '').slice(0, 500),
+  })
+  return { ok: !error && data === true }
 }
 
 function makeSlug(c: Content) {
@@ -111,7 +133,7 @@ export async function updateSlug(id: string, raw: string): Promise<{ ok: boolean
   const { data: auth } = await supabase.auth.getUser()
   if (!auth.user) return { ok: false, error: 'Please sign in again.' }
   const { data, error } = await supabase.from('invitations').update({ slug }).eq('id', id).eq('user_id', auth.user.id).select('slug').maybeSingle()
-  if (error?.code === '23505' || error?.message.includes('duplicate')) return { ok: false, error: `"${slug}" is already taken. Try adding something, e.g. ${slug}-wedding.` }
+  if (error?.code === '23505' || error?.message.includes('duplicate') || error?.message.includes('link_taken')) return { ok: false, error: `"${slug}" is already taken. Try adding something, e.g. ${slug}-wedding.` }
   if (error) return { ok: false, error: error.message }
   if (!data) return { ok: false, error: 'Card not found.' }
   return { ok: true, slug: data.slug }

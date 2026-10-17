@@ -2,10 +2,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type PointerEvent as RPointerEvent, type ReactNode, type RefObject } from 'react'
 import Link from 'next/link'
 import { saveCanvas } from '@/app/actions'
-import SharePaywall, { PAY_MESSAGES } from '../SharePaywall'
+import { PAY_MESSAGES } from '../SharePaywall'
+import UnlockCardLink from '../UnlockCardLink'
+import QrButton from '../QrButton'
+import { uploadMedia } from '@/lib/upload'
 import LinkNameField from '../LinkNameField'
-import { SHARE_PRICE_LABEL } from '@/lib/pricing'
-import { createClient } from '@/lib/supabase/client'
 import {
   CANVAS_FONTS, CH, CW, MAX_ELEMENTS, ORNAMENTS, PATTERNS, createElement, newId,
   type AddKind, type CanvasBg, type CanvasDoc, type CanvasEl, type FontKey, type ImageEl, type OrnamentEl, type ShapeEl, type TextEl,
@@ -13,7 +14,7 @@ import {
 import { backgroundStyle, elementBox, ElementBody } from './CanvasCard'
 import OrnamentSvg from './OrnamentSvg'
 
-type Props = { invitationId: string; userId: string; slug: string; siteUrl: string; initial: CanvasDoc; initialTitle: string; initialPublished: boolean; sharePaid: boolean; payResult?: string }
+type Props = { invitationId: string; userId: string; slug: string; siteUrl: string; initial: CanvasDoc; initialTitle: string; initialPublished: boolean; sharePaid: boolean; credits: number; payResult?: string }
 type Drag =
   | { mode: 'move'; id: string; sx: number; sy: number; ox: number; oy: number }
   | { mode: 'resize'; id: string; corner: 'nw' | 'ne' | 'sw' | 'se'; sx: number; sy: number; o: { x: number; y: number; w: number; h: number } }
@@ -34,7 +35,9 @@ const ADD_TEXT: [AddKind, string][] = [['heading', 'Heading'], ['script', 'Names
 const ADD_SHAPES: [AddKind, string][] = [['shape:rect', 'Rectangle'], ['shape:circle', 'Circle'], ['shape:line', 'Line'], ['shape:arch', 'Arch frame']]
 const ORNAMENT_LABEL: Record<string, string> = { mandala: 'Mandala', divider: 'Divider', corner: 'Corner', lantern: 'Lantern', crescent: 'Crescent', leaf: 'Leaves', flower: 'Flower', star: 'Star' }
 
-export default function Designer({ invitationId, userId, slug, siteUrl, initial, initialTitle, initialPublished, sharePaid, payResult }: Props) {
+export default function Designer({ invitationId, userId, slug, siteUrl, initial, initialTitle, initialPublished, sharePaid: paid0, credits: credits0, payResult }: Props) {
+  const [sharePaid, setSharePaid] = useState(paid0)
+  const [credits, setCredits] = useState(credits0)
   const [doc, setDocState] = useState<CanvasDoc>(initial)
   const [selected, setSelected] = useState<string | null>(null)
   const [title, setTitle] = useState(initialTitle)
@@ -299,17 +302,13 @@ export default function Designer({ invitationId, userId, slug, siteUrl, initial,
 
   async function upload(file: File | undefined, apply: (url: string) => void) {
     if (!file) return
-    if (!file.type.startsWith('image/')) return setStatus('Please choose an image file.')
-    if (file.size > 5 * 1024 * 1024) return setStatus('Images must be under 5 MB.')
-    setStatus('Uploading image…')
-    const supabase = createClient()
-    const ext = (file.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 5) || 'jpg'
-    const path = `${userId}/${invitationId}-${Date.now()}.${ext}`
-    const { error } = await supabase.storage.from('photos').upload(path, file, { upsert: false, contentType: file.type })
-    if (error) return setStatus(`Upload failed: ${error.message}`)
-    apply(supabase.storage.from('photos').getPublicUrl(path).data.publicUrl)
-    setStatus('Image added.')
+    setStatus('Shrinking and uploading image…')
+    try {
+      apply(await uploadMedia(file, userId, `canvas-${invitationId}`))
+      setStatus('Image added.')
+    } catch (e) { setStatus((e as Error).message) }
   }
+
 
   const ornamentChoices = useMemo(() => ORNAMENTS.map((o) => [`ornament:${o}` as AddKind, ORNAMENT_LABEL[o], o] as const), [])
 
@@ -409,6 +408,13 @@ export default function Designer({ invitationId, userId, slug, siteUrl, initial,
             </>
           )}
 
+          {panel === 'share' && (
+            <div className="share-box">
+              <h3>Personal guest links</h3>
+              <p className="muted">Each guest gets their own link that greets them by name. You see who opened it and who is coming.</p>
+              <Link className="btn small" href={`/dashboard/${invitationId}/guests`}>Guest list and links</Link>
+            </div>
+          )}
           {panel === 'share' && <LinkNameField invitationId={invitationId} slug={linkSlug} siteUrl={siteUrl} live={published} paid={sharePaid} onSaved={setLinkSlug} />}
           {panel === 'share' && (
             published ? (
@@ -418,6 +424,7 @@ export default function Designer({ invitationId, userId, slug, siteUrl, initial,
                   <button type="button" onClick={() => navigator.clipboard.writeText(link).then(() => setStatus('Link copied.'), () => setStatus('Copy failed. Select the link and copy it.'))}>Copy link</button>
                   <a href={`https://wa.me/?text=${encodeURIComponent(`${title} ${link}`)}`} target="_blank" rel="noreferrer">Share on WhatsApp</a>
                   <a href={link} target="_blank" rel="noreferrer">Open card</a>
+                  <QrButton link={link} label="QR code" fileName={`qr-${linkSlug}`} />
                 </div>
                 <p className="muted">Anyone with the link can open the card in their browser. Changes you save show up on the same link.</p>
                 <button type="button" className="link" onClick={() => save(false)}>Unpublish (take the link offline)</button>
@@ -428,7 +435,8 @@ export default function Designer({ invitationId, userId, slug, siteUrl, initial,
                 <button className="btn" disabled={saving} aria-busy={busyBtn === 'publish'} onClick={() => save(true)}>Publish and get link</button>
               </>
             ) : (
-              <SharePaywall invitationId={invitationId} beforePay={() => save(false)} />
+              <UnlockCardLink invitationId={invitationId} credits={credits} returnTo={`/design/${invitationId}`} beforeUnlock={() => save(false)}
+                onUnlocked={() => { setSharePaid(true); setPublished(true); setCredits((n) => Math.max(0, n - 1)); setStatus('Your card link is live.') }} />
             )
           )}
         </div>
@@ -438,7 +446,7 @@ export default function Designer({ invitationId, userId, slug, siteUrl, initial,
           <div>
             <button className="btn ghost small" disabled={saving} aria-busy={busyBtn === 'save'} onClick={() => save()}>Save</button>
             {!published && sharePaid && <button className="btn small" disabled={saving} aria-busy={busyBtn === 'publish'} onClick={() => save(true)}>Publish</button>}
-            {!sharePaid && <button className="btn small" disabled={saving} onClick={() => setPanel('share')}>Get link · {SHARE_PRICE_LABEL}</button>}
+            <Link className="btn small" href={`/dashboard/${invitationId}/guests`}>Guests</Link>
           </div>
         </footer>
       </aside>

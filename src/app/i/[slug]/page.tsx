@@ -1,37 +1,40 @@
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import InvitationView from '@/components/InvitationView'
-import { createClient } from '@/lib/supabase/server'
-import { normalize } from '@/lib/types'
 import CanvasPage from '@/components/canvas/CanvasPage'
 import { sanitizeCanvas } from '@/lib/canvas'
+import { loadPublicCard } from '@/lib/publicCard'
+import { normalize } from '@/lib/types'
 
 type Props = { params: Promise<{ slug: string }> }
 
-async function load(slug: string) {
-  const supabase = await createClient()
-  // Row-level security returns the row only if it is published (or you own it).
-  const { data } = await supabase.from('invitations').select('*').eq('slug', slug).maybeSingle()
-  return data
-}
-
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const row = await load((await params).slug)
-  if (!row) return { title: 'Invitation not found' }
-  if (row.kind === 'canvas') {
-    const title = String(row.content?.name1 || 'You are invited')
-    return { title, description: 'You are invited. Open the card to see the details.', openGraph: { title, description: 'You are invited.' } }
+  const { slug } = await params
+  const found = await loadPublicCard(slug)
+  if (!found) return { title: 'Invitation not found' }
+  const { card, guest } = found
+  const dear = guest ? `${guest.name}, you are invited` : 'You are invited'
+  if (card.kind === 'canvas') {
+    const title = String((card.content as { name1?: string })?.name1 || 'You are invited')
+    return { title, description: `${dear}. Open the card to see the details.`, openGraph: { title, description: `${dear}.` }, robots: { index: false } }
   }
-  const { content } = normalize(row.content, row.design, row.template)
-  const title = `${[content.name1, content.name2].filter(Boolean).join(' & ')} — ${content.eventType}`
-  const description = content.message || content.heading
-  return { title, description, openGraph: { title, description, images: content.photoUrl ? [content.photoUrl] : undefined } }
+  const { content } = normalize(card.content as never, card.design as never, card.template)
+  const names = [content.name1, content.name2].filter(Boolean).join(' & ')
+  const title = names ? `${names} · ${content.eventType}` : content.eventType
+  const description = guest ? `${dear} to ${content.eventType.toLowerCase()} celebrations. Tap to open your invitation.` : content.message || content.heading
+  return { title, description, openGraph: { title, description, type: 'website' }, twitter: { card: 'summary_large_image', title, description }, robots: { index: false } }
 }
 
 export default async function InvitationPage({ params }: Props) {
-  const row = await load((await params).slug)
-  if (!row) notFound()
-  if (row.kind === 'canvas') return <CanvasPage doc={sanitizeCanvas(row.canvas)} />
-  const { content, design } = normalize(row.content, row.design, row.template)
-  return <div className="full"><InvitationView content={content} design={design} invitationId={row.published ? row.id : undefined} /></div>
+  const { slug } = await params
+  const found = await loadPublicCard(slug)
+  if (!found) notFound()
+  const { card, guest, canReply } = found
+  if (card.kind === 'canvas') return <CanvasPage doc={sanitizeCanvas(card.canvas)} guest={guest} slug={slug} canReply={canReply} invitationId={card.id} />
+  const { content, design } = normalize(card.content as never, card.design as never, card.template)
+  return (
+    <div className="full">
+      <InvitationView content={content} design={design} invitationId={canReply ? card.id : undefined} guest={guest} trackSlug={slug} />
+    </div>
+  )
 }

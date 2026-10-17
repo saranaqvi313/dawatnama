@@ -1,12 +1,12 @@
 /** Payment bookkeeping shared by the payment routes. Server-only. */
 import { randomBytes } from 'node:crypto'
-import { serverPrice, serverSharePrice } from './pricing'
+import { PRODUCTS, serverPriceOf, type ProductId } from './pricing'
 import { safepayConfig } from './safepay'
 import { createAdminClient } from './supabase/admin'
 
 export type PaymentMethod = 'card' | 'demo'
 /** 'premium' unlocks design for the account; 'share' unlocks one card's share link. */
-export type PaymentPurpose = 'premium' | 'share'
+export type PaymentPurpose = 'premium' | 'share' | 'credits' | 'package'
 export const isCardId = (v: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v)
 
 /**
@@ -29,15 +29,27 @@ export const isOrderRef = (v: string) => /^[A-Za-z0-9]{6,30}$/.test(v)
 /** Records a pending payment. `tracker` is Safepay's token for this exact amount. */
 export async function createPendingPayment(
   userId: string, method: PaymentMethod,
-  opts: { orderRef?: string; tracker?: string; amountPkr?: number; purpose?: PaymentPurpose; invitationId?: string } = {},
+  opts: { orderRef?: string; tracker?: string; product?: ProductId; returnPath?: string } = {},
 ) {
   const orderRef = opts.orderRef ?? newOrderRef()
-  const purpose = opts.purpose ?? 'premium'
-  const amountPkr = opts.amountPkr ?? (purpose === 'share' ? serverSharePrice() : serverPrice())
-  const { error } = await createAdminClient().from('payments')
-    .insert({ user_id: userId, order_ref: orderRef, method, amount_pkr: amountPkr, gateway_ref: opts.tracker ?? null, purpose, invitation_id: purpose === 'share' ? opts.invitationId : null })
+  const product = PRODUCTS[opts.product ?? 'premium']
+  const purpose: PaymentPurpose = product.premium && product.credits > 0 ? 'package' : product.credits > 0 ? 'credits' : 'premium'
+  const amountPkr = serverPriceOf(product.id)
+  const { error } = await createAdminClient().from('payments').insert({
+    user_id: userId, order_ref: orderRef, method, amount_pkr: amountPkr, gateway_ref: opts.tracker ?? null,
+    purpose, credits: product.credits, product: product.id, return_path: safeReturn(opts.returnPath),
+  })
   if (error) throw new Error(`Could not record payment: ${error.message}`)
   return { orderRef, amountPkr }
+}
+
+/** Only same-site paths, e.g. /dashboard/123/guests. */
+export function safeReturn(path: string | null | undefined): string | null {
+  return path && /^\/[^/\\]/.test(path) && path.length <= 200 && !/[\s<>"]/.test(path) ? path : null
+}
+
+export function withResult(path: string, result: string) {
+  return `${path}${path.includes('?') ? '&' : '?'}pay=${encodeURIComponent(result)}`
 }
 
 /**
@@ -57,18 +69,14 @@ export async function completeVerifiedPayment(orderRef: string, tracker: string,
   return data === true
 }
 
-/** Page to return to after a payment: the Premium page, or the card that was paid for. */
+/** Page to return to after a payment: where the customer started, or the plans page. */
 export async function returnPathFor(orderRef: string, result: string): Promise<string> {
   if (isOrderRef(orderRef)) {
-    const { data } = await createAdminClient().from('payments').select('purpose, invitation_id').eq('order_ref', orderRef).maybeSingle()
-    if (data?.purpose === 'share' && data.invitation_id) return cardPath(data.invitation_id, result)
+    const { data } = await createAdminClient().from('payments').select('purpose, invitation_id, return_path').eq('order_ref', orderRef).maybeSingle()
+    if (data?.return_path) return withResult(data.return_path, result)
+    if (data?.purpose === 'share' && data.invitation_id) return withResult(`/dashboard/${data.invitation_id}`, result)
   }
   return `/premium?result=${result}`
-}
-
-/** The editor of a card, with the payment result shown there. Designer cards redirect onwards. */
-export function cardPath(invitationId: string, result: string) {
-  return `/dashboard/${invitationId}?pay=${encodeURIComponent(result)}`
 }
 
 /** Finds the order that a Safepay tracker belongs to (used by webhooks). */

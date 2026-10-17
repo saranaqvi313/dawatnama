@@ -2,7 +2,7 @@ import { headers } from 'next/headers'
 import { notFound, redirect } from 'next/navigation'
 import Designer from '@/components/canvas/Designer'
 import { sanitizeCanvas } from '@/lib/canvas'
-import { isPremium } from '@/lib/premium'
+import { isPremium, linkCredits } from '@/lib/premium'
 import { createClient } from '@/lib/supabase/server'
 
 export const metadata = { title: 'Designer — Dawatnama' }
@@ -22,6 +22,6 @@ export default async function DesignPage({ params, searchParams }: { params: Pro
   return (
     <Designer invitationId={data.id} userId={auth.user.id} slug={data.slug} siteUrl={siteUrl}
       initial={sanitizeCanvas(data.canvas)} initialTitle={String(data.content?.name1 || 'My card')} initialPublished={data.published}
-      sharePaid={Boolean(data.share_paid)} payResult={pay} />
+      sharePaid={Boolean(data.share_paid)} credits={await linkCredits(supabase, auth.user.id)} payResult={pay} />
   )
 }

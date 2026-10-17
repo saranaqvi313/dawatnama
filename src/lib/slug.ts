@@ -5,6 +5,7 @@ export const RESERVED_SLUGS = new Set([
   'i', 'api', 'auth', 'dashboard', 'design', 'login', 'logout', 'premium', 'preview', 'templates', 'admin',
   'about', 'help', 'faq', 'terms', 'privacy', 'contact', 'pricing', 'signin', 'signup', 'account', 'settings',
   'static', 'public', 'assets', 'images', 'favicon', 'robots', 'sitemap', 'manifest', 'www', 'app', 'dawatnama',
+  'cards', 'refund-policy', 'refund', 'guests', 'plans', 'opengraph-image', 'twitter-image', 'icon', 'apple-icon', 'error', 'not-found',
 ])
 
 export const SLUG_MIN = 3

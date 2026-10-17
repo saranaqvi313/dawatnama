@@ -25,8 +25,9 @@ export default async function Nav() {
   ]
   if (name) {
     items.push({ href: '/dashboard', label: t.dashboard, match: ['/dashboard', '/design'] })
-    if (!premium) items.push({ href: '/premium', label: 'Go Premium', match: ['/premium'], className: 'hide-sm premium-link' })
-  } else {
+  }
+  items.push({ href: '/premium', label: premium ? 'Plans' : 'Plans & prices', match: ['/premium'], className: 'hide-sm premium-link' })
+  if (!name) {
     items.push({ href: '/login', label: t.signin, match: ['/login'], className: 'nav-cta' })
   }
   return (

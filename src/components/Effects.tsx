@@ -56,7 +56,7 @@ void main() {
   gl_FragColor = vec4(uColor, t * vAlpha * 0.85);
 }`
 
-/** Three.js particle layer: petals, sparkles, stars or hearts drifting over the card. */
+/** Three.js particle layer: petals, sparkles, stars, fireflies or hearts drifting over the card. */
 export default function Effects({ kind, color }: { kind: string; color: string }) {
   const ref = useRef<HTMLCanvasElement>(null)
 
@@ -76,7 +76,7 @@ export default function Effects({ kind, color }: { kind: string; color: string }
     const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 50)
     camera.position.z = 10
 
-    const N = kind === 'stars' ? 160 : kind === 'sparkles' ? 110 : 60
+    const N = kind === 'stars' ? 160 : kind === 'sparkles' ? 110 : kind === 'fireflies' ? 46 : 60
     const W = 12, H = 10
     const pos = new Float32Array(N * 3)
     const seed = new Float32Array(N)
@@ -94,8 +94,8 @@ export default function Effects({ kind, color }: { kind: string; color: string }
       vertexShader: vertex, fragmentShader: fragment, transparent: true, depthWrite: false,
       uniforms: {
         uMap: { value: tex }, uColor: { value: new THREE.Color(color) }, uTime: { value: 0 },
-        uSize: { value: kind === 'petals' || kind === 'hearts' ? 26 : kind === 'stars' ? 12 : 16 },
-        uTwinkle: { value: kind === 'stars' || kind === 'sparkles' ? 1 : 0 },
+        uSize: { value: kind === 'petals' || kind === 'hearts' ? 26 : kind === 'stars' ? 12 : kind === 'fireflies' ? 22 : 16 },
+        uTwinkle: { value: kind === 'stars' || kind === 'sparkles' || kind === 'fireflies' ? 1 : 0 },
         uSpin: { value: kind === 'petals' ? 1 : 0 },
       },
     })
@@ -118,7 +118,16 @@ export default function Effects({ kind, color }: { kind: string; color: string }
       const t = clock.elapsedTime
       mat.uniforms.uTime.value = t
       const vy = kind === 'petals' ? -0.9 : kind === 'hearts' ? 0.7 : kind === 'sparkles' ? 0.25 : 0
-      if (vy !== 0) {
+      if (kind === 'fireflies') {
+        // slow wandering glow, like fireflies in a garden at night
+        for (let i = 0; i < N; i++) {
+          pos[i * 3] += Math.sin(t * (0.3 + seed[i] * 0.5) + seed[i] * 20) * 0.45 * dt
+          pos[i * 3 + 1] += Math.cos(t * (0.25 + seed[i] * 0.4) + seed[i] * 11) * 0.35 * dt
+          if (pos[i * 3] > W / 2) pos[i * 3] = -W / 2
+          if (pos[i * 3] < -W / 2) pos[i * 3] = W / 2
+        }
+        geo.attributes.position.needsUpdate = true
+      } else if (vy !== 0) {
         for (let i = 0; i < N; i++) {
           pos[i * 3 + 1] += vy * (0.5 + seed[i]) * dt
           pos[i * 3] += Math.sin(t * (0.5 + seed[i]) + seed[i] * 10) * 0.35 * dt

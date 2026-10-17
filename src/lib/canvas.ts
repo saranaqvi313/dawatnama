@@ -9,8 +9,19 @@ export const CH = 640
 export const CANVAS_FONTS = {
   playfair: { label: 'Playfair Display', css: "'Playfair Display', serif" },
   cormorant: { label: 'Cormorant Garamond', css: "'Cormorant Garamond', serif" },
-  greatvibes: { label: 'Great Vibes (script)', css: "'Great Vibes', cursive" },
+  cinzel: { label: 'Cinzel', css: "'Cinzel', serif" },
+  marcellus: { label: 'Marcellus', css: "'Marcellus', serif" },
   poppins: { label: 'Poppins', css: "'Poppins', sans-serif" },
+  greatvibes: { label: 'Great Vibes (script)', css: "'Great Vibes', cursive" },
+  pinyon: { label: 'Pinyon Script', css: "'Pinyon Script', cursive" },
+  alexbrush: { label: 'Alex Brush', css: "'Alex Brush', cursive" },
+  parisienne: { label: 'Parisienne', css: "'Parisienne', cursive" },
+  allura: { label: 'Allura', css: "'Allura', cursive" },
+  italianno: { label: 'Italianno', css: "'Italianno', cursive" },
+  rouge: { label: 'Rouge Script', css: "'Rouge Script', cursive" },
+  monsieur: { label: 'Monsieur La Doulaise', css: "'Monsieur La Doulaise', cursive" },
+  petitformal: { label: 'Petit Formal Script', css: "'Petit Formal Script', cursive" },
+  tangerine: { label: 'Tangerine', css: "'Tangerine', cursive" },
 } as const
 export type FontKey = keyof typeof CANVAS_FONTS
 
