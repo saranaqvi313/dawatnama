@@ -357,3 +357,35 @@ html.navigating, html.navigating * { cursor: progress; }
 
 /* ---- Share link paywall ---- */
 .share-lock h3 { margin: 0; }
+
+/* ---- Navigation layout: row on wide screens, hamburger menu on phones ---- */
+.nav-wrap { display: contents; }
+.nav-user { display: flex; align-items: center; gap: clamp(.7rem, 2vw, 1.2rem); }
+.nav-toggle { display: none; }
+@media (max-width: 860px) {
+  .nav-wrap { display: block; }
+  .nav-toggle {
+    display: grid; align-content: center; justify-items: center; gap: 5px; width: 2.75rem; height: 2.75rem;
+    border: 1.5px solid var(--line); border-radius: 12px; background: #fff; cursor: pointer; padding: 0;
+  }
+  .nav-toggle span { display: block; width: 1.25rem; height: 2px; border-radius: 2px; background: var(--green); transition: transform .25s, opacity .2s; }
+  .nav-toggle.open span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
+  .nav-toggle.open span:nth-child(2) { opacity: 0; }
+  .nav-toggle.open span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
+  .nav nav {
+    display: none; position: absolute; top: 100%; left: 0; right: 0; z-index: 30;
+    flex-direction: column; align-items: stretch; gap: .25rem; flex-wrap: nowrap;
+    padding: .75rem 1rem 1rem; background: var(--paper); border-bottom: 1px solid var(--line);
+    box-shadow: 0 18px 30px -18px #12382d55;
+  }
+  .nav nav.open { display: flex; animation: menu-in .18s ease-out; }
+  .nav nav a.nav-link, .nav nav a.nav-link.hide-sm { display: block; padding: .8em 1em; border-radius: 12px; font-size: 1rem; }
+  .nav nav a.nav-link::after { display: none; }
+  .nav nav a.nav-link.nav-cta { text-align: center; margin-top: .3rem; }
+  .nav-user { flex-wrap: wrap; justify-content: space-between; margin-top: .5rem; padding-top: .8rem; border-top: 1px solid var(--line); }
+  .nav-user .who { max-width: 60%; }
+  .nav-user form { flex-basis: 100%; }
+  .nav-user form .btn { width: 100%; padding: .7em 1em; font-size: 1rem; }
+}
+@keyframes menu-in { from { opacity: 0; transform: translateY(-6px) } to { opacity: 1; transform: none } }
+@media (prefers-reduced-motion: reduce) { .nav nav.open { animation: none; } .nav-toggle span { transition: none; } }

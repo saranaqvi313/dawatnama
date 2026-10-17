@@ -2,8 +2,8 @@ import Link from 'next/link'
 import { dict } from '@/lib/i18n'
 import { createClient, getLang } from '@/lib/supabase/server'
 import { displayName, isPremium } from '@/lib/premium'
-import NavLinks, { type NavItem } from './NavLinks'
-import SubmitButton from './SubmitButton'
+import { type NavItem } from './NavLinks'
+import NavMenu from './NavMenu'
 
 export default async function Nav() {
   const lang = await getLang()
@@ -32,16 +32,7 @@ export default async function Nav() {
   return (
     <header className="nav">
       <Link href="/" className="logo"><span>D</span>{t.brand}</Link>
-      <nav>
-        <NavLinks items={items} />
-        {name && (
-          <>
-            {premium && <span className="pill premium" title="Premium is active">Premium</span>}
-            <span className="who" title="Signed in">{name}</span>
-            <form action="/auth/signout" method="post"><SubmitButton className="btn ghost small">{t.signout}</SubmitButton></form>
-          </>
-        )}
-      </nav>
+      <NavMenu items={items} name={name} premium={premium} signoutLabel={t.signout} />
     </header>
   )
 }
