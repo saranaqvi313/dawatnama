@@ -37,7 +37,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
               <div className="row-actions">
                 <Link className="btn small" href={r.kind === 'canvas' ? `/design/${r.id}` : `/dashboard/${r.id}`}>{t.edit}</Link>
                 {r.kind !== 'canvas' && <Link className="btn ghost small" href={`/dashboard/${r.id}/rsvps`}>{t.guests}</Link>}
-                {r.published && <Link className="btn ghost small" href={`/i/${r.slug}`} target="_blank">{t.view}</Link>}
+                {r.published && <Link className="btn ghost small" href={`/${r.slug}`} target="_blank">{t.view}</Link>}
                 <form action={deleteInvitation}><input type="hidden" name="id" value={r.id} /><SubmitButton className="link danger">{t.del}</SubmitButton></form>
               </div>
             </li>

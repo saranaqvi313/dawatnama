@@ -5,6 +5,7 @@ import { CANVAS_TEMPLATES } from '../src/lib/canvasTemplates'
 import { checkoutUrl, verifyRedirectSignature, verifyWebhookSignature } from '../src/lib/safepay'
 import { createHmac } from 'node:crypto'
 import { normalizePhone, parsePhone, safeNext } from '../src/lib/identity'
+import { isPossibleSlug, slugProblem, toSlug } from '../src/lib/slug'
 import { accountEmail, accountPassword, ensureAccount } from '../src/lib/phoneAccount'
 
 test('Pakistani numbers normalise to E.164', () => {
@@ -134,4 +135,18 @@ test('payments: demo mode is impossible on the production deployment', async () 
   process.env.VERCEL_ENV = 'preview'
   assert.equal(paymentMode(), 'demo')
   process.env = env
+})
+
+test('card links: your-site.com/<guest-name>', () => {
+  assert.equal(toSlug('Ali Khan'), 'ali-khan')
+  assert.equal(toSlug('  Ayesha & Ali!! '), 'ayesha-and-ali')
+  assert.equal(toSlug('Zoë  Ahmed--Family'), 'zoe-ahmed-family')
+  assert.equal(toSlug('علی'), '')
+  assert.equal(slugProblem('ali-khan'), '')
+  assert.match(slugProblem('al'), /at least/)
+  assert.match(slugProblem('dashboard'), /used by the website/)
+  assert.match(slugProblem('ali_khan'), /English letters/)
+  assert.ok(isPossibleSlug('ali-khan-x1'))
+  assert.ok(!isPossibleSlug('favicon.ico'))
+  assert.ok(!isPossibleSlug('templates'))
 })

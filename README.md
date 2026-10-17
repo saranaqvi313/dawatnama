@@ -13,7 +13,7 @@ Built with Next.js 15, Supabase (database, sign-in, photo storage), Safepay (car
 | Premium page and card payments | `/premium`, `src/app/api/pay/*`, `src/lib/safepay.ts` |
 | Drag-and-drop designer (Premium) | `/design/[id]`, `src/components/canvas/*` |
 | Dashboard, editor, RSVP list, CSV export | `/dashboard/...` |
-| Public invitation / shared card link | `/i/[slug]` |
+| Public invitation / shared card link | `/<link-name>` (e.g. `/ali-khan`; set in the Share tab), also `/i/<link-name>` |
 | Database tables and security rules | `supabase/schema.sql` |
 
 ## What is free and what costs money

@@ -4,6 +4,7 @@ import Link from 'next/link'
 import InvitationView from './InvitationView'
 import { saveInvitation } from '@/app/actions'
 import SharePaywall, { PAY_MESSAGES } from './SharePaywall'
+import LinkNameField from './LinkNameField'
 import { SHARE_PRICE_LABEL } from '@/lib/pricing'
 import { createClient } from '@/lib/supabase/client'
 import { EVENT_TYPES, FONTS, OPTIONS, PALETTES, type Content, type Design, type EventItem, type Invitation } from '@/lib/types'
@@ -24,7 +25,8 @@ export default function Editor({ invitation, siteUrl, premium, sharePaid, payRes
 
   const c = <K extends keyof Content>(k: K, v: Content[K]) => setContent((p) => ({ ...p, [k]: v }))
   const d = <K extends keyof Design>(k: K, v: Design[K]) => setDesign((p) => ({ ...p, [k]: v }))
-  const link = `${siteUrl}/i/${invitation.slug}`
+  const [slug, setSlug] = useState(invitation.slug)
+  const link = `${siteUrl}/${slug}`
 
   const persist = async (pub: boolean) => {
     const res = await saveInvitation(invitation.id, { content, design, published: pub })
@@ -179,6 +181,7 @@ export default function Editor({ invitation, siteUrl, premium, sharePaid, payRes
 
           {tab === 'Share' && (
             <>
+              <LinkNameField invitationId={invitation.id} slug={slug} siteUrl={siteUrl} live={published} onSaved={setSlug} />
               {published ? (
                 <>
                   <label>Your invitation link<input readOnly value={link} onFocus={(e) => e.target.select()} /></label>

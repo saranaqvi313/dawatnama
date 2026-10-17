@@ -5,6 +5,7 @@ import { getTemplate, type Content, type Design } from '@/lib/types'
 import { isPremium } from '@/lib/premium'
 import { sanitizeCanvas } from '@/lib/canvas'
 import { getCanvasTemplate } from '@/lib/canvasTemplates'
+import { slugProblem, toSlug } from '@/lib/slug'
 
 export async function submitRsvp(input: { invitationId: string; name: string; attending: string; guests: number; message: string }) {
   const name = input.name.trim().slice(0, 80)
@@ -99,4 +100,19 @@ export async function saveCanvas(id: string, input: { doc: unknown; title: strin
     .update({ canvas: sanitizeCanvas(input.doc), published, content: { ...(row.content ?? {}), name1: title } })
     .eq('id', id).eq('user_id', auth.user.id)
   return saveResult(error, published)
+}
+
+/** Sets the name in a card's link (your-site.com/<name>). Must be unique across the site. */
+export async function updateSlug(id: string, raw: string): Promise<{ ok: boolean; slug?: string; error?: string }> {
+  const slug = toSlug(String(raw ?? ''))
+  const problem = slugProblem(slug)
+  if (problem) return { ok: false, error: problem }
+  const supabase = await createClient()
+  const { data: auth } = await supabase.auth.getUser()
+  if (!auth.user) return { ok: false, error: 'Please sign in again.' }
+  const { data, error } = await supabase.from('invitations').update({ slug }).eq('id', id).eq('user_id', auth.user.id).select('slug').maybeSingle()
+  if (error?.code === '23505' || error?.message.includes('duplicate')) return { ok: false, error: `"${slug}" is already taken. Try adding something, e.g. ${slug}-wedding.` }
+  if (error) return { ok: false, error: error.message }
+  if (!data) return { ok: false, error: 'Card not found.' }
+  return { ok: true, slug: data.slug }
 }

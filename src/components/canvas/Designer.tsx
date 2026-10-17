@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type
 import Link from 'next/link'
 import { saveCanvas } from '@/app/actions'
 import SharePaywall, { PAY_MESSAGES } from '../SharePaywall'
+import LinkNameField from '../LinkNameField'
 import { SHARE_PRICE_LABEL } from '@/lib/pricing'
 import { createClient } from '@/lib/supabase/client'
 import {
@@ -59,7 +60,8 @@ export default function Designer({ invitationId, userId, slug, siteUrl, initial,
 
   const scale = fitScale * zoom
   const sel = doc.elements.find((e) => e.id === selected) ?? null
-  const link = `${siteUrl}/i/${slug}`
+  const [linkSlug, setLinkSlug] = useState(slug)
+  const link = `${siteUrl}/${linkSlug}`
   const ink = isLight(doc.bg.color) ? '#2b2b2b' : '#f6efdc'
   const accent = (doc.elements.find((e) => e.type === 'ornament') as OrnamentEl | undefined)?.color ?? (isLight(doc.bg.color) ? '#b8892b' : '#d4af37')
 
@@ -407,6 +409,7 @@ export default function Designer({ invitationId, userId, slug, siteUrl, initial,
             </>
           )}
 
+          {panel === 'share' && <LinkNameField invitationId={invitationId} slug={linkSlug} siteUrl={siteUrl} live={published} onSaved={setLinkSlug} />}
           {panel === 'share' && (
             published ? (
               <>
