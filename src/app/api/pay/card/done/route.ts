@@ -1,12 +1,12 @@
 import { NextResponse, type NextRequest } from 'next/server'
-import { completeVerifiedPayment, siteUrl } from '@/lib/payments'
+import { completeVerifiedPayment, returnPathFor, siteUrl } from '@/lib/payments'
 import { safepayConfig, verifyRedirectSignature } from '@/lib/safepay'
 
 export const runtime = 'nodejs'
 
 /**
  * Safepay sends the customer back here after a successful card payment, with tracker,
- * sig, reference and order_id. Premium is switched on only if the signature is valid and
+ * sig, reference and order_id. Premium (or the card's share link) is switched on only if the signature is valid and
  * the tracker is the one created for this order.
  */
 async function handle(request: NextRequest) {
@@ -27,10 +27,11 @@ async function handle(request: NextRequest) {
   const config = safepayConfig()
 
   if (!config || !verifyRedirectSignature(config.secret, tracker, sig)) {
-    return NextResponse.redirect(`${site}/premium?result=failed`, 303)
+    return NextResponse.redirect(`${site}${await returnPathFor(orderRef, 'failed').catch(() => '/premium?result=failed')}`, 303)
   }
   const ok = await completeVerifiedPayment(orderRef, tracker, 'SAFEPAY_REDIRECT').catch(() => false)
-  return NextResponse.redirect(`${site}/premium?result=${ok ? 'paid' : 'failed'}`, 303)
+  const path = await returnPathFor(orderRef, ok ? 'paid' : 'failed').catch(() => `/premium?result=${ok ? 'paid' : 'failed'}`)
+  return NextResponse.redirect(`${site}${path}`, 303)
 }
 
 export const GET = handle

@@ -324,3 +324,36 @@ label.file:focus-within { outline: 2px solid var(--gold); outline-offset: 2px; }
 
 /* ---- Sign-in ---- */
 .small-note { margin: -.4rem 0 0; font-size: .85rem; text-align: center; }
+
+/* ---- Navigation: hover effect and the page you are on ---- */
+.nav nav a.nav-link { position: relative; padding: .45em .95em; border-radius: 999px; color: var(--green); font-size: .95rem; text-decoration: none; transition: background-color .2s, color .2s, box-shadow .2s; }
+.nav-link::after { content: ''; position: absolute; left: .95em; right: .95em; bottom: .28em; height: 2px; border-radius: 2px; background: var(--gold); transform: scaleX(0); transform-origin: left; transition: transform .25s ease; }
+.nav-link:hover { background: #12382d0f; }
+.nav-link:hover::after { transform: scaleX(1); }
+.nav nav a.nav-link.active { background: var(--green); color: #fff; font-weight: 500; box-shadow: 0 4px 14px -6px #12382d88; }
+.nav-link.active::after, .nav-link.nav-cta::after { display: none; }
+.nav nav a.nav-link.nav-cta { background: var(--green); color: #fff; font-weight: 500; }
+.nav-link.nav-cta:hover { box-shadow: 0 6px 18px #12382d33; transform: translateY(-1px); }
+.nav nav a.nav-link.premium-link:not(.active) { color: #7a5a12; }
+.nav-link.premium-link:not(.active):hover { background: #f3e6c4; }
+@media (prefers-reduced-motion: reduce) { .nav-link, .nav-link::after { transition: none; } }
+
+/* ---- Loading spinner on any button or button-link while its action runs ---- */
+button, .btn { --spin: var(--green); }
+.btn:not(.ghost), .nav-link.active, .nav-link.nav-cta, .chips button.on { --spin: #fff; }
+.inv-btn { --spin: var(--ink); }
+.inv-btn.solid { --spin: var(--bg); }
+:is(button, a)[aria-busy="true"] { position: relative; color: transparent !important; pointer-events: none; cursor: progress; }
+:is(button, a)[aria-busy="true"]:disabled { opacity: 1; }
+:is(button, a)[aria-busy="true"]::after {
+  content: ''; display: block; position: absolute; inset: 0; left: 0; right: 0; bottom: 0; margin: auto;
+  width: 1.05em; height: 1.05em; border-radius: 50%; background: none;
+  border: 2px solid var(--spin, var(--green)); border-right-color: transparent;
+  transform-origin: center; animation: btn-spin .7s linear infinite;
+}
+button.link[aria-busy="true"] { min-width: 1.6em; min-height: 1.2em; }
+@keyframes btn-spin { from { transform: rotate(0) } to { transform: rotate(360deg) } }
+html.navigating, html.navigating * { cursor: progress; }
+
+/* ---- Share link paywall ---- */
+.share-lock h3 { margin: 0; }

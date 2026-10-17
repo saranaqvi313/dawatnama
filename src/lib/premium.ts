@@ -10,7 +10,7 @@ export async function isPremium(supabase: SupabaseClient, userId: string | undef
 export function displayName(user: User): string {
   const full = String(user.user_metadata?.full_name || '').trim()
   if (full) return full
-  if (user.email) return user.email.split('@')[0]
   if (user.phone) return `+${user.phone.replace(/^\+/, '')}`
+  if (user.email && !user.email.endsWith('@phone.dawatnama.app')) return user.email.split('@')[0]
   return 'Account'
 }

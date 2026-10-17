@@ -85,7 +85,7 @@ function RsvpForm({ invitationId, t }: { invitationId?: string; t: (typeof cardT
         <label className="row">{t.guests}<input name="guests" type="number" min={1} max={20} defaultValue={1} /></label>
       )}
       <textarea name="message" maxLength={500} rows={2} placeholder={t.note} aria-label={t.note} />
-      <button className="inv-btn solid" disabled={state === 'busy' || !invitationId}>{t.send}</button>
+      <button className="inv-btn solid" disabled={state === 'busy' || !invitationId} aria-busy={state === 'busy'}>{t.send}</button>
       {!invitationId && <small>{t.demo}</small>}
       {state === 'error' && <small role="alert">{t.error}</small>}
     </form>

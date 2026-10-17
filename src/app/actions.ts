@@ -38,16 +38,27 @@ export async function createInvitation(formData: FormData) {
   redirect(`/dashboard/${data.id}`)
 }
 
-export async function saveInvitation(id: string, patch: { content: Content; design: Design; published: boolean }) {
+type SaveResult = { ok: boolean; published: boolean; error?: string }
+
+export async function saveInvitation(id: string, patch: { content: Content; design: Design; published: boolean }): Promise<SaveResult> {
   const supabase = await createClient()
   const { data: auth } = await supabase.auth.getUser()
-  if (!auth.user) return { ok: false, error: 'Please sign in again.' }
+  if (!auth.user) return { ok: false, published: false, error: 'Please sign in again.' }
   const premium = await isPremium(supabase, auth.user.id)
-  // Free accounts save text, events and publishing only; the database rejects design changes too.
-  const update = premium ? patch : { content: patch.content, published: patch.published }
+  const { data: row } = await supabase.from('invitations').select('share_paid').eq('id', id).eq('user_id', auth.user.id).maybeSingle()
+  if (!row) return { ok: false, published: false, error: 'Card not found.' }
+  // Publishing (the share link) needs this card to be paid for; the database enforces it too.
+  const published = Boolean(patch.published && row.share_paid)
+  // Free accounts save details and events only; the database rejects design changes too.
+  const update = premium ? { ...patch, published } : { content: patch.content, published }
   const { error } = await supabase.from('invitations').update(update).eq('id', id).eq('user_id', auth.user.id)
-  if (error?.message.includes('premium_required')) return { ok: false, error: 'Customising the design needs Premium.' }
-  return { ok: !error, error: error?.message }
+  return saveResult(error, published)
+}
+
+function saveResult(error: { message: string } | null, published: boolean): SaveResult {
+  if (error?.message.includes('premium_required')) return { ok: false, published, error: 'Customising the design needs Premium.' }
+  if (error?.message.includes('payment_required')) return { ok: false, published, error: 'Pay for this card to get its share link.' }
+  return { ok: !error, published, error: error?.message }
 }
 
 export async function deleteInvitation(formData: FormData) {
@@ -75,17 +86,17 @@ export async function createCanvasInvitation(formData: FormData) {
 }
 
 /** Saves a drag-and-drop card. The card is re-validated here; the database enforces Premium. */
-export async function saveCanvas(id: string, input: { doc: unknown; title: string; published: boolean }) {
+export async function saveCanvas(id: string, input: { doc: unknown; title: string; published: boolean }): Promise<SaveResult> {
   const supabase = await createClient()
   const { data: auth } = await supabase.auth.getUser()
-  if (!auth.user) return { ok: false, error: 'Please sign in again.' }
-  if (!(await isPremium(supabase, auth.user.id))) return { ok: false, error: 'The designer needs Premium.' }
-  const { data: row } = await supabase.from('invitations').select('content').eq('id', id).eq('user_id', auth.user.id).maybeSingle()
-  if (!row) return { ok: false, error: 'Card not found.' }
+  if (!auth.user) return { ok: false, published: false, error: 'Please sign in again.' }
+  if (!(await isPremium(supabase, auth.user.id))) return { ok: false, published: false, error: 'The designer needs Premium.' }
+  const { data: row } = await supabase.from('invitations').select('content, share_paid').eq('id', id).eq('user_id', auth.user.id).maybeSingle()
+  if (!row) return { ok: false, published: false, error: 'Card not found.' }
   const title = String(input.title ?? '').trim().slice(0, 80) || 'My card'
+  const published = Boolean(input.published && row.share_paid)
   const { error } = await supabase.from('invitations')
-    .update({ canvas: sanitizeCanvas(input.doc), published: Boolean(input.published), content: { ...(row.content ?? {}), name1: title } })
+    .update({ canvas: sanitizeCanvas(input.doc), published, content: { ...(row.content ?? {}), name1: title } })
     .eq('id', id).eq('user_id', auth.user.id)
-  if (error?.message.includes('premium_required')) return { ok: false, error: 'The designer needs Premium.' }
-  return { ok: !error, error: error?.message }
+  return saveResult(error, published)
 }

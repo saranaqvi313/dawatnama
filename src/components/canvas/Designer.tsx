@@ -2,6 +2,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type PointerEvent as RPointerEvent, type ReactNode, type RefObject } from 'react'
 import Link from 'next/link'
 import { saveCanvas } from '@/app/actions'
+import SharePaywall, { PAY_MESSAGES } from '../SharePaywall'
+import { SHARE_PRICE_LABEL } from '@/lib/pricing'
 import { createClient } from '@/lib/supabase/client'
 import {
   CANVAS_FONTS, CH, CW, MAX_ELEMENTS, ORNAMENTS, PATTERNS, createElement, newId,
@@ -10,7 +12,7 @@ import {
 import { backgroundStyle, elementBox, ElementBody } from './CanvasCard'
 import OrnamentSvg from './OrnamentSvg'
 
-type Props = { invitationId: string; userId: string; slug: string; siteUrl: string; initial: CanvasDoc; initialTitle: string; initialPublished: boolean }
+type Props = { invitationId: string; userId: string; slug: string; siteUrl: string; initial: CanvasDoc; initialTitle: string; initialPublished: boolean; sharePaid: boolean; payResult?: string }
 type Drag =
   | { mode: 'move'; id: string; sx: number; sy: number; ox: number; oy: number }
   | { mode: 'resize'; id: string; corner: 'nw' | 'ne' | 'sw' | 'se'; sx: number; sy: number; o: { x: number; y: number; w: number; h: number } }
@@ -31,15 +33,16 @@ const ADD_TEXT: [AddKind, string][] = [['heading', 'Heading'], ['script', 'Names
 const ADD_SHAPES: [AddKind, string][] = [['shape:rect', 'Rectangle'], ['shape:circle', 'Circle'], ['shape:line', 'Line'], ['shape:arch', 'Arch frame']]
 const ORNAMENT_LABEL: Record<string, string> = { mandala: 'Mandala', divider: 'Divider', corner: 'Corner', lantern: 'Lantern', crescent: 'Crescent', leaf: 'Leaves', flower: 'Flower', star: 'Star' }
 
-export default function Designer({ invitationId, userId, slug, siteUrl, initial, initialTitle, initialPublished }: Props) {
+export default function Designer({ invitationId, userId, slug, siteUrl, initial, initialTitle, initialPublished, sharePaid, payResult }: Props) {
   const [doc, setDocState] = useState<CanvasDoc>(initial)
   const [selected, setSelected] = useState<string | null>(null)
   const [title, setTitle] = useState(initialTitle)
   const [published, setPublished] = useState(initialPublished)
   const [dirty, setDirty] = useState(false)
-  const [status, setStatus] = useState('')
+  const [status, setStatus] = useState(payResult ? PAY_MESSAGES[payResult] ?? '' : '')
+  const [busyBtn, setBusyBtn] = useState<'save' | 'publish' | ''>('')
   const [saving, setSaving] = useState(false)
-  const [panel, setPanel] = useState<'add' | 'element' | 'background' | 'layers' | 'share'>('add')
+  const [panel, setPanel] = useState<'add' | 'element' | 'background' | 'layers' | 'share'>(payResult ? 'share' : 'add')
   const [guides, setGuides] = useState<{ v: boolean; h: boolean }>({ v: false, h: false })
   const [fitScale, setFitScale] = useState(1)
   const [zoom, setZoom] = useState(1)
@@ -280,15 +283,16 @@ export default function Designer({ invitationId, userId, slug, siteUrl, initial,
   }, [dirty])
 
   // ---- saving & uploads -------------------------------------------------------------------
-  async function save(publish?: boolean) {
-    setSaving(true); setStatus('Saving…')
+  async function save(publish?: boolean): Promise<boolean> {
+    setSaving(true); setBusyBtn(publish && !published ? 'publish' : 'save'); setStatus('Saving…')
     const res = await saveCanvas(invitationId, { doc: docRef.current, title, published: publish ?? published })
-    setSaving(false)
-    if (!res.ok) return setStatus(res.error ?? 'Could not save.')
-    if (publish !== undefined) setPublished(publish)
+    setSaving(false); setBusyBtn('')
+    if (!res.ok) { setStatus(res.error ?? 'Could not save.'); return false }
+    setPublished(res.published)
     setDirty(false)
-    setStatus((publish ?? published) ? 'Saved. Your link shows the latest version.' : 'Saved as draft.')
+    setStatus(res.published ? 'Saved. Your link shows the latest version.' : 'Saved.')
     if (publish) setPanel('share')
+    return true
   }
 
   async function upload(file: File | undefined, apply: (url: string) => void) {
@@ -415,11 +419,13 @@ export default function Designer({ invitationId, userId, slug, siteUrl, initial,
                 <p className="muted">Anyone with the link can open the card in their browser. Changes you save show up on the same link.</p>
                 <button type="button" className="link" onClick={() => save(false)}>Unpublish (take the link offline)</button>
               </>
-            ) : (
+            ) : sharePaid ? (
               <>
-                <p className="muted">Publish the card to get a link you can copy and send to anyone.</p>
-                <button className="btn" disabled={saving} onClick={() => save(true)}>Publish and get link</button>
+                <p className="muted">This card is paid for. Publish it to put the link online again.</p>
+                <button className="btn" disabled={saving} aria-busy={busyBtn === 'publish'} onClick={() => save(true)}>Publish and get link</button>
               </>
+            ) : (
+              <SharePaywall invitationId={invitationId} beforePay={() => save(false)} />
             )
           )}
         </div>
@@ -427,8 +433,9 @@ export default function Designer({ invitationId, userId, slug, siteUrl, initial,
         <footer className="dz-foot">
           <small aria-live="polite">{status || (dirty ? 'Unsaved changes' : 'All changes saved')}</small>
           <div>
-            <button className="btn ghost small" disabled={saving} onClick={() => save()}>Save</button>
-            {!published && <button className="btn small" disabled={saving} onClick={() => save(true)}>Publish</button>}
+            <button className="btn ghost small" disabled={saving} aria-busy={busyBtn === 'save'} onClick={() => save()}>Save</button>
+            {!published && sharePaid && <button className="btn small" disabled={saving} aria-busy={busyBtn === 'publish'} onClick={() => save(true)}>Publish</button>}
+            {!sharePaid && <button className="btn small" disabled={saving} onClick={() => setPanel('share')}>Get link · {SHARE_PRICE_LABEL}</button>}
           </div>
         </footer>
       </aside>

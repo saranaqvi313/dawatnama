@@ -3,17 +3,22 @@ import { useState, useTransition } from 'react'
 import Link from 'next/link'
 import InvitationView from './InvitationView'
 import { saveInvitation } from '@/app/actions'
+import SharePaywall, { PAY_MESSAGES } from './SharePaywall'
+import { SHARE_PRICE_LABEL } from '@/lib/pricing'
 import { createClient } from '@/lib/supabase/client'
 import { EVENT_TYPES, FONTS, OPTIONS, PALETTES, type Content, type Design, type EventItem, type Invitation } from '@/lib/types'
 
 const TABS = ['Details', 'Events', 'Design', 'Share'] as const
 
-export default function Editor({ invitation, siteUrl, premium }: { invitation: Invitation; siteUrl: string; premium: boolean }) {
+type Props = { invitation: Invitation; siteUrl: string; premium: boolean; sharePaid: boolean; payResult?: string }
+
+export default function Editor({ invitation, siteUrl, premium, sharePaid, payResult }: Props) {
   const [content, setContent] = useState<Content>(invitation.content)
   const [design, setDesign] = useState<Design>(invitation.design)
   const [published, setPublished] = useState(invitation.published)
-  const [tab, setTab] = useState<(typeof TABS)[number]>('Details')
-  const [status, setStatus] = useState('')
+  const [tab, setTab] = useState<(typeof TABS)[number]>(payResult ? 'Share' : 'Details')
+  const [status, setStatus] = useState(payResult ? PAY_MESSAGES[payResult] ?? '' : '')
+  const [saving, setSaving] = useState<'save' | 'publish' | ''>('')
   const [replay, setReplay] = useState(0)
   const [pending, start] = useTransition()
 
@@ -21,13 +26,20 @@ export default function Editor({ invitation, siteUrl, premium }: { invitation: I
   const d = <K extends keyof Design>(k: K, v: Design[K]) => setDesign((p) => ({ ...p, [k]: v }))
   const link = `${siteUrl}/i/${invitation.slug}`
 
-  const save = (pub = published) =>
+  const persist = async (pub: boolean) => {
+    const res = await saveInvitation(invitation.id, { content, design, published: pub })
+    if (res.ok) { setPublished(res.published); setStatus(res.published ? 'Saved. Your link is live.' : 'Saved.') }
+    else setStatus(`Could not save: ${res.error ?? 'unknown error'}`)
+    return res.ok
+  }
+  const save = (pub = published) => {
+    // Set outside the transition so the spinner shows immediately.
+    setSaving(pub && !published ? 'publish' : 'save'); setStatus('Saving…')
     start(async () => {
-      setStatus('Saving…')
-      const res = await saveInvitation(invitation.id, { content, design, published: pub })
-      if (res.ok) { setPublished(pub); setStatus(pub ? 'Saved. Your link is live.' : 'Saved as draft.') }
-      else setStatus(`Could not save: ${res.error ?? 'unknown error'}`)
+      await persist(pub)
+      setSaving('')
     })
+  }
 
   const setEvent = (i: number, k: keyof EventItem, v: string) =>
     c('events', content.events.map((e, j) => (j === i ? { ...e, [k]: v } : e)))
@@ -178,8 +190,13 @@ export default function Editor({ invitation, siteUrl, premium }: { invitation: I
                   </div>
                   <button type="button" className="link" onClick={() => save(false)}>Unpublish (take the link offline)</button>
                 </>
+              ) : sharePaid ? (
+                <>
+                  <p className="muted">This card is paid for. Publish it to put the link online again.</p>
+                  <button type="button" className="btn" disabled={pending} aria-busy={saving === 'publish'} onClick={() => save(true)}>Publish</button>
+                </>
               ) : (
-                <p className="muted">Publish to get a link you can share. You can keep editing afterwards; the same link always shows the latest version.</p>
+                <SharePaywall invitationId={invitation.id} beforePay={() => persist(false)} />
               )}
             </>
           )}
@@ -188,8 +205,9 @@ export default function Editor({ invitation, siteUrl, premium }: { invitation: I
         <div className="ed-foot">
           <small aria-live="polite">{status}</small>
           <div>
-            <button className="btn ghost" disabled={pending} onClick={() => save()}>Save</button>
-            {!published && <button className="btn" disabled={pending} onClick={() => { save(true); setTab('Share') }}>Publish</button>}
+            <button className="btn ghost" disabled={pending} aria-busy={saving === 'save'} onClick={() => save()}>Save</button>
+            {!published && sharePaid && <button className="btn" disabled={pending} aria-busy={saving === 'publish'} onClick={() => { save(true); setTab('Share') }}>Publish</button>}
+            {!sharePaid && <button className="btn" disabled={pending} onClick={() => setTab('Share')}>Get link · {SHARE_PRICE_LABEL}</button>}
           </div>
         </div>
       </aside>

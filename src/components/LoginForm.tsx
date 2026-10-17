@@ -48,7 +48,7 @@ export default function LoginForm({ next }: { next: string }) {
       <label>Mobile number
         <input name="phone" type="tel" required autoComplete="tel" inputMode="tel" placeholder="0300 1234567" dir="ltr" />
       </label>
-      <button className="btn" disabled={busy}>{busy ? 'Signing in…' : 'Continue'}</button>
+      <button className="btn" disabled={busy} aria-busy={busy}>Continue</button>
       <p className="muted small-note">New here? Your account is created with your number.</p>
       {error && <p className="err" role="alert">{error}</p>}
     </form>

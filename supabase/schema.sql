@@ -168,3 +168,89 @@ end $$;
 drop trigger if exists invitations_premium_gate on public.invitations;
 create trigger invitations_premium_gate before insert or update on public.invitations
   for each row execute function public.enforce_premium_customisation();
+
+-- ======================================================================================
+-- Share links: each card's link costs a one-off fee (Rs 100), separate from Premium.
+-- Premium unlocks design; paying for a card unlocks that card's share link.
+-- Safe to run again.
+-- ======================================================================================
+alter table public.invitations add column if not exists share_paid boolean not null default false;
+alter table public.invitations add column if not exists share_paid_at timestamptz;
+
+-- First run only: cards that were already live before this change keep their link.
+do $$ begin
+  if not exists (select 1 from pg_trigger where tgname = 'invitations_share_gate') then
+    update public.invitations set share_paid = true, share_paid_at = coalesce(share_paid_at, now())
+     where published and not share_paid;
+  end if;
+end $$;
+
+-- What a payment was for: Premium for the account, or one card's share link.
+alter table public.payments add column if not exists purpose text not null default 'premium';
+alter table public.payments add column if not exists invitation_id uuid;
+do $$ begin
+  alter table public.payments add constraint payments_purpose_check check (purpose in ('premium', 'share'));
+exception when duplicate_object then null; end $$;
+do $$ begin
+  alter table public.payments add constraint payments_share_has_card check (purpose = 'premium' or invitation_id is not null);
+exception when duplicate_object then null; end $$;
+
+-- Only published AND paid cards are visible to people with the link, or accept RSVPs.
+drop policy if exists "public read published" on public.invitations;
+create policy "public read published" on public.invitations for select to anon, authenticated
+  using (published = true and share_paid = true);
+drop policy if exists "guest insert rsvp" on public.rsvps;
+create policy "guest insert rsvp" on public.rsvps for insert to anon, authenticated
+  with check (exists (select 1 from public.invitations i where i.id = invitation_id and i.published and i.share_paid));
+
+-- Users cannot mark a card as paid themselves, and cannot publish a card that is not paid.
+create or replace function public.enforce_share_payment() returns trigger
+language plpgsql security definer set search_path = '' as $$
+begin
+  if auth.uid() is null then
+    return new;  -- server-side jobs (service role) after a verified payment
+  end if;
+  if tg_op = 'INSERT' then
+    if new.share_paid or new.share_paid_at is not null or new.published then
+      raise exception 'payment_required' using errcode = 'P0001', hint = 'Pay for this card to get its share link.';
+    end if;
+  else
+    if new.share_paid is distinct from old.share_paid or new.share_paid_at is distinct from old.share_paid_at then
+      raise exception 'payment_required' using errcode = 'P0001', hint = 'Only a verified payment can unlock a share link.';
+    end if;
+    if new.published and not new.share_paid then
+      raise exception 'payment_required' using errcode = 'P0001', hint = 'Pay for this card to get its share link.';
+    end if;
+  end if;
+  return new;
+end $$;
+drop trigger if exists invitations_share_gate on public.invitations;
+create trigger invitations_share_gate before insert or update on public.invitations
+  for each row execute function public.enforce_share_payment();
+
+-- Completes a verified payment once: Premium for the account, or the paid card's link (published).
+create or replace function public.complete_payment(p_order_ref text, p_gateway_ref text, p_gateway_status text)
+returns boolean language plpgsql security definer set search_path = '' as $$
+declare v_user uuid; v_purpose text; v_card uuid;
+begin
+  update public.payments
+     set status = 'paid', paid_at = now(), gateway_ref = p_gateway_ref, gateway_status = p_gateway_status
+   where order_ref = p_order_ref and status = 'pending'
+  returning user_id, purpose, invitation_id into v_user, v_purpose, v_card;
+  if v_user is null then
+    return exists (select 1 from public.payments where order_ref = p_order_ref and status = 'paid');
+  end if;
+  if v_purpose = 'share' then
+    update public.invitations
+       set share_paid = true, share_paid_at = coalesce(share_paid_at, now()), published = true
+     where id = v_card and user_id = v_user;
+  else
+    insert into public.profiles (user_id, is_premium, premium_since)
+         values (v_user, true, now())
+    on conflict (user_id) do update set is_premium = true,
+           premium_since = coalesce(public.profiles.premium_since, now()), updated_at = now();
+  end if;
+  return true;
+end $$;
+revoke all on function public.complete_payment(text, text, text) from public, anon, authenticated;
+grant execute on function public.complete_payment(text, text, text) to service_role;

@@ -1,8 +1,9 @@
 import Link from 'next/link'
 import Nav from '@/components/Nav'
+import SubmitButton from '@/components/SubmitButton'
 import { paymentMode } from '@/lib/payments'
 import { isPremium } from '@/lib/premium'
-import { PRICE_LABEL } from '@/lib/pricing'
+import { PRICE_LABEL, SHARE_PRICE_LABEL } from '@/lib/pricing'
 import { createClient } from '@/lib/supabase/server'
 
 export const metadata = { title: 'Premium — Dawatnama' }
@@ -41,6 +42,7 @@ export default async function Premium({ searchParams }: { searchParams: Promise<
           <h1>Design your card your way</h1>
           <p className="price"><b>{PRICE_LABEL}</b> <span className="muted">one time, for all your cards</span></p>
           <ul className="perks">{PERKS.map((p) => <li key={p}>{p}</li>)}</ul>
+          <p className="muted small-note">Share links are separate: {SHARE_PRICE_LABEL} per card, paid from the card&apos;s Share tab.</p>
 
           {result && <p className={`notice ${result.cls}`} role="status">{result.text}</p>}
 
@@ -64,7 +66,7 @@ export default async function Premium({ searchParams }: { searchParams: Promise<
                   <h3>Pay by debit or credit card</h3>
                   <p className="muted">Visa or Mastercard from any bank. You&apos;ll enter your card on Safepay&apos;s secure payment page, then come straight back here.</p>
                 </div>
-                <button className="btn">Pay {PRICE_LABEL} by card</button>
+                <SubmitButton className="btn">Pay {PRICE_LABEL} by card</SubmitButton>
               </form>
             </div>
           )}

@@ -1,4 +1,6 @@
 import type { Metadata, Viewport } from 'next'
+import { Suspense } from 'react'
+import BusyLinks from '@/components/BusyLinks'
 import { getLang } from '@/lib/supabase/server'
 import './globals.css'
 
@@ -19,7 +21,10 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Great+Vibes&family=Playfair+Display:wght@400;600;700&family=Poppins:wght@300;400;500;600&display=swap" />
       </head>
-      <body>{children}</body>
+      <body>
+        <Suspense fallback={null}><BusyLinks /></Suspense>
+        {children}
+      </body>
     </html>
   )
 }

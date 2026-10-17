@@ -2,6 +2,8 @@ import Link from 'next/link'
 import { dict } from '@/lib/i18n'
 import { createClient, getLang } from '@/lib/supabase/server'
 import { displayName, isPremium } from '@/lib/premium'
+import NavLinks, { type NavItem } from './NavLinks'
+import SubmitButton from './SubmitButton'
 
 export default async function Nav() {
   const lang = await getLang()
@@ -16,24 +18,28 @@ export default async function Nav() {
       premium = await isPremium(supabase, user.id)
     }
   }
+  const items: NavItem[] = [
+    { href: '/templates', label: t.templates, match: ['/templates', '/preview'] },
+    { href: '/#how', label: t.how, className: 'hide-sm' },
+    { href: '/#faq', label: t.faq, className: 'hide-sm' },
+  ]
+  if (name) {
+    items.push({ href: '/dashboard', label: t.dashboard, match: ['/dashboard', '/design'] })
+    if (!premium) items.push({ href: '/premium', label: 'Go Premium', match: ['/premium'], className: 'hide-sm premium-link' })
+  } else {
+    items.push({ href: '/login', label: t.signin, match: ['/login'], className: 'nav-cta' })
+  }
   return (
     <header className="nav">
       <Link href="/" className="logo"><span>D</span>{t.brand}</Link>
       <nav>
-        <Link href="/templates">{t.templates}</Link>
-        <Link href="/#how" className="hide-sm">{t.how}</Link>
-        <Link href="/#faq" className="hide-sm">{t.faq}</Link>
-        {name ? (
+        <NavLinks items={items} />
+        {name && (
           <>
-            <Link href="/dashboard" className="btn small">{t.dashboard}</Link>
-            {premium
-              ? <span className="pill premium" title="Premium is active">Premium</span>
-              : <Link href="/premium" className="hide-sm">Go Premium</Link>}
+            {premium && <span className="pill premium" title="Premium is active">Premium</span>}
             <span className="who" title="Signed in">{name}</span>
-            <form action="/auth/signout" method="post"><button className="btn ghost small">{t.signout}</button></form>
+            <form action="/auth/signout" method="post"><SubmitButton className="btn ghost small">{t.signout}</SubmitButton></form>
           </>
-        ) : (
-          <Link href="/login" className="btn small">{t.signin}</Link>
         )}
       </nav>
     </header>

@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { createInvitation } from '@/app/actions'
 import { FONTS, TEMPLATES } from '@/lib/types'
+import SubmitButton from './SubmitButton'
 
 export default function TemplateGrid({ labels }: { labels: { preview: string; use: string } }) {
   return (
@@ -16,7 +17,7 @@ export default function TemplateGrid({ labels }: { labels: { preview: string; us
             <Link href={`/preview/${t.id}`} className="btn ghost small">{labels.preview}</Link>
             <form action={createInvitation}>
               <input type="hidden" name="template" value={t.id} />
-              <button className="btn small">{labels.use}</button>
+              <SubmitButton className="btn small">{labels.use}</SubmitButton>
             </form>
           </div>
         </article>

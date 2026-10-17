@@ -16,16 +16,17 @@ Built with Next.js 15, Supabase (database, sign-in, photo storage), Safepay (car
 | Public invitation / shared card link | `/i/[slug]` |
 | Database tables and security rules | `supabase/schema.sql` |
 
-## What is free and what is Premium
+## What is free and what costs money
 
-| Free | Premium (one payment, all cards) |
-| --- | --- |
-| Pick a template, edit names, events, message, photo, family list | Design tab: colours, fonts, artwork, opening animation, 3D effects, card style |
-| Publish and share the link, collect RSVPs | Drag-and-drop designer and its design templates |
+| Free | Share link (Rs 100 per card) | Premium (Rs 1,499 once, all cards) |
+| --- | --- | --- |
+| Pick a template; edit names, details, events, message, photo, family list | A link for that card to send on WhatsApp; guests open it and RSVP | Design tab: colours, fonts, artwork, opening animation, 3D effects, card style |
+| Preview the card while you edit | Pay once per card from its **Share** tab; unpublish and republish freely | Drag-and-drop designer and its design templates |
 
-Premium is enforced by the database (`enforce_premium_customisation` trigger), not only by the app,
-so it cannot be bypassed with the public anon key. Only the server can switch Premium on, and only
-after Safepay confirms the payment.
+Share links and Premium are separate payments. Both are enforced by the database
+(`enforce_share_payment` and `enforce_premium_customisation` triggers), not only by the app,
+so they cannot be bypassed with the public anon key. Only the server can unlock them, and only
+after Safepay confirms the payment. Cards that were already live before share links became paid keep working.
 
 ## 1. Set up Supabase
 
@@ -64,9 +65,9 @@ Card details never reach your server.
 
 How it works:
 
-- **Pay by card** creates a Safepay payment for the price set on the server (`PREMIUM_PRICE_PKR`) and sends the customer to Safepay.
+- **Pay by card** creates a Safepay payment for the price set on the server (`PREMIUM_PRICE_PKR`, or `SHARE_PRICE_PKR` for a card's link) and sends the customer to Safepay.
 - After paying, Safepay sends them back to `/api/pay/card/done` with a signed confirmation.
-- Premium switches on only if the signature is valid **and** it is for the payment we created for that order.
+- Premium (or the card's link) switches on only if the signature is valid **and** it is for the payment we created for that order.
 - The webhook does the same check, so Premium still switches on if the customer never comes back.
 
 **No Safepay keys yet?** Set `PAYMENT_MODE=demo` to try the whole flow with a test checkout (no money moves).
@@ -83,6 +84,7 @@ Import the repository, then add these **Environment Variables** (all are describ
 | `SUPABASE_SERVICE_ROLE_KEY` | service_role key (secret) |
 | `NEXT_PUBLIC_SITE_URL` | e.g. `https://dawatnama.vercel.app` |
 | `PREMIUM_PRICE_PKR`, `NEXT_PUBLIC_PREMIUM_PRICE_PKR` | `1499` |
+| `SHARE_PRICE_PKR`, `NEXT_PUBLIC_SHARE_PRICE_PKR` | `100` |
 | `PAYMENT_MODE` | `card` (or `demo` on Preview deployments) |
 | `SAFEPAY_ENV` | `sandbox`, later `production` |
 | `SAFEPAY_API_KEY`, `SAFEPAY_SECRET_KEY` | from Safepay → Developer |
@@ -116,7 +118,7 @@ Database security tests (on a throwaway local PostgreSQL, never your Supabase pr
 ```bash
 psql -d scratch -f supabase/tests/supabase_stub.sql
 psql -d scratch -f supabase/schema.sql
-psql -d scratch -f supabase/tests/premium_gate.sql   # 22 checks; rolls back
+psql -d scratch -f supabase/tests/premium_gate.sql   # 37 checks; rolls back
 ```
 
 ## Security notes

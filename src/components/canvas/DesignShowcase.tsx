@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { createCanvasInvitation } from '@/app/actions'
 import { CANVAS_TEMPLATES } from '@/lib/canvasTemplates'
 import CanvasCard from './CanvasCard'
+import SubmitButton from '../SubmitButton'
 
 /** Home page: the drag-and-drop design templates. */
 export default function DesignShowcase({ premium }: { premium: boolean }) {
@@ -20,7 +21,7 @@ export default function DesignShowcase({ premium }: { premium: boolean }) {
             <Link href={`/preview/${t.id}`} className="btn ghost small">Preview</Link>
             <form action={createCanvasInvitation}>
               <input type="hidden" name="template" value={t.id} />
-              <button className="btn small">{premium ? 'Customise this design' : 'Customise (Premium)'}</button>
+              <SubmitButton className="btn small">{premium ? 'Customise this design' : 'Customise (Premium)'}</SubmitButton>
             </form>
           </div>
         </article>
