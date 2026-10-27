@@ -11,10 +11,11 @@ import Scene from './Scene'
 import LinkNameField from './LinkNameField'
 import QrButton from './QrButton'
 import { Chips, ColorField, Label, Notice, Panel, SwitchRow, UploadBox } from './ui'
-import { saveInvitation } from '@/app/actions'
+import { convertToDesigner, saveInvitation } from '@/app/actions'
+import { useRouter } from 'next/navigation'
 import { activateCardLink } from '@/app/guestActions'
 import { PAY_MESSAGES } from './SharePaywall'
-import { PRODUCTS, rupees } from '@/lib/pricing'
+import { FREE_MODE, PRODUCTS, rupees } from '@/lib/pricing'
 import { uploadMedia } from '@/lib/upload'
 import { videoEmbed } from '@/lib/media'
 import { EVENT_TYPES, FONTS, OPTIONS, PALETTES, SCRIPT_FONTS, TEXT_FONTS, type Content, type Design, type EventItem, type Invitation } from '@/lib/types'
@@ -46,6 +47,15 @@ export default function Editor({ invitation, siteUrl, premium, sharePaid: paid0,
   const [showOpening, setShowOpening] = useState(false)
   const [pending, start] = useTransition()
   const [slug, setSlug] = useState(invitation.slug)
+  const router = useRouter()
+  const [converting, setConverting] = useState(false)
+  async function openInDesigner() {
+    setConverting(true); setStatus('Opening in the designer…')
+    if (!(await persist(published))) { setConverting(false); return }
+    const res = await convertToDesigner(invitation.id)
+    if (!res.ok) { setConverting(false); setStatus(res.error ?? 'Could not open the designer.'); return }
+    router.push(`/design/${invitation.id}`)
+  }
   const link = `${siteUrl}/${slug}`
   const guestsHref = `/dashboard/${invitation.id}/guests`
 
@@ -124,6 +134,7 @@ export default function Editor({ invitation, siteUrl, premium, sharePaid: paid0,
             <div className="text-h6 truncate" dir="auto">{names}</div>
             <span className={`label ${published ? 'label-green' : 'label-gray'}`}>{published ? 'Live' : 'Draft'}</span>
           </div>
+          <Button isStroke icon="magic-pencil" className="gap-2 max-md:!px-4" onClick={openInDesigner} disabled={converting} aria-busy={converting || undefined}>Design freely</Button>
           <Button isStroke onClick={() => save()} disabled={pending} aria-busy={saving === 'save' || undefined}>Save</Button>
           <Button isBlack as="link" href={guestsHref} onClick={() => { void persist(published) }}>Guests</Button>
         </div>
@@ -333,7 +344,7 @@ export default function Editor({ invitation, siteUrl, premium, sharePaid: paid0,
               </Card>
               <Card title="Personal guest links">
                 <div className={FORM}>
-                  <div className="text-body-2 text-t-secondary">Each guest gets their own link, like <span dir="ltr" className="text-t-primary">{siteUrl.replace(/^https?:\/\//, '')}/ali-khan</span>. The card greets them by name, and you see who opened it and who is coming. {rupees(PRODUCTS.links1.price)} per guest, less in bundles.</div>
+                  <div className="text-body-2 text-t-secondary">Each guest gets their own link, like <span dir="ltr" className="text-t-primary">{siteUrl.replace(/^https?:\/\//, '')}/ali-khan</span>. The card greets them by name, and you see who opened it and who is coming. {FREE_MODE ? 'Free.' : `${rupees(PRODUCTS.links1.price)} per guest, less in bundles.`}</div>
                   <Button className="self-start" isBlack as="link" href={guestsHref}>Guest list and links</Button>
                 </div>
               </Card>
@@ -358,9 +369,9 @@ export default function Editor({ invitation, siteUrl, premium, sharePaid: paid0,
                     </>
                   ) : (
                     <Panel>
-                      <div className="mb-5 text-body-2 text-t-secondary">One link anyone can open (for a WhatsApp group or Instagram). Uses 1 guest link. You have {credits}.</div>
-                      {credits > 0
-                        ? <Button className="w-full" isBlack disabled={!!saving} aria-busy={saving === 'unlock' || undefined} onClick={unlock}>Unlock with 1 link</Button>
+                      <div className="mb-5 text-body-2 text-t-secondary">One link anyone can open (for a WhatsApp group or Instagram).{FREE_MODE ? ' Free.' : ` Uses 1 guest link. You have ${credits}.`}</div>
+                      {FREE_MODE || credits > 0
+                        ? <Button className="w-full" isBlack disabled={!!saving} aria-busy={saving === 'unlock' || undefined} onClick={unlock}>{FREE_MODE ? 'Get my card link' : 'Unlock with 1 link'}</Button>
                         : <Button className="w-full" isBlack as="link" href={`/premium?return=${encodeURIComponent(`/dashboard/${invitation.id}`)}`}>Buy links</Button>}
                       <div className="mt-3 text-caption text-t-tertiary">Your full link appears here once it is unlocked.</div>
                     </Panel>

@@ -4,7 +4,8 @@ import { notFound } from 'next/navigation'
 import Button from '@/components/Button'
 import Card from '@/components/Card'
 import Icon from '@/components/Icon'
-import Shell from '@/components/dawat/Shell'
+import PublicShell from '@/components/dawat/PublicShell'
+import { getViewer } from '@/lib/viewer'
 import FaqList from '@/components/dawat/FaqList'
 import { PROSE } from '@/components/dawat/legal/LegalPage'
 import Scene from '@/components/dawat/Scene'
@@ -33,7 +34,8 @@ export default async function SeoCard({ params }: Props) {
   ]
   const ld = { '@context': 'https://schema.org', '@type': 'FAQPage', mainEntity: faq.map((f) => ({ '@type': 'Question', name: f.q, acceptedAnswer: { '@type': 'Answer', text: f.a } })) }
   return (
-    <Shell title="Card ideas">
+    <PublicShell viewer={await getViewer()}>
+      <div className="max-w-300 mx-auto px-6 max-md:px-4">
       <div className="flex max-lg:block">
         <div className="col-left">
           <div className="card px-12 py-16 max-lg:p-8 max-lg:px-6">
@@ -87,6 +89,7 @@ export default async function SeoCard({ params }: Props) {
           </Card>
         </div>
       </div>
-    </Shell>
+      </div>
+    </PublicShell>
   )
 }

@@ -256,3 +256,57 @@ test('number + password sign-in: new account, old number-only account, wrong pas
   assert.equal(users.find((u) => u.id === 'old')!.user_metadata.password_set, true)
   assert.equal((await go('+923002222222', 'Other@Night1')).ok, false)
 })
+
+test('designer cards: new element types, animations and card magic are validated', () => {
+  const doc = sanitizeCanvas({
+    h: 99999,
+    fx: { opening: 'gates', effect: 'petals', effectColor: 'red;background:url(x)', music: 'javascript:alert(1)', sealText: 'A'.repeat(500) },
+    elements: [
+      { type: 'video', src: 'http://evil.example/v.mp4', anim: 'rise', delay: 99, link: 'javascript:alert(1)' },
+      { type: 'video', src: 'https://youtu.be/dQw4w9WgXcQ', anim: 'explode' },
+      { type: 'scene', name: 'castle', color: '#abcdef' },
+      { type: 'scene', name: '<script>' },
+      { type: 'text', text: 'Hi', foil: true, bg: 'url(x)', link: 'https://maps.google.com/?q=Serena' },
+      { type: 'image', mask: 'heart', filter: 'evil' },
+    ],
+  })
+  assert.equal(doc.h, 2560)
+  assert.equal(doc.fx.opening, 'gates')
+  assert.equal(doc.fx.effect, 'petals')
+  assert.equal(doc.fx.effectColor, '#e8c66a')
+  assert.equal(doc.fx.music, '')
+  assert.equal(doc.fx.sealText.length, 80)
+  const [v1, v2, s1, s2, t, img] = doc.elements as Record<string, unknown>[]
+  assert.equal(v1.src, '')
+  assert.equal(v1.anim, 'rise')
+  assert.equal(v1.delay, 10)
+  assert.equal(v1.link, '')
+  assert.equal(v2.src, 'https://youtu.be/dQw4w9WgXcQ')
+  assert.equal(v2.anim, 'none')
+  assert.equal(s1.name, 'castle')
+  assert.equal(s2.name, 'sheesh')
+  assert.equal(t.foil, true)
+  assert.equal(t.bg, 'transparent')
+  assert.equal(t.link, 'https://maps.google.com/?q=Serena')
+  assert.equal(img.mask, 'heart')
+  assert.equal(img.filter, 'none')
+})
+
+test('old designer cards still load (no height, no effects)', () => {
+  const doc = sanitizeCanvas({ v: 1, bg: { color: '#000000' }, elements: [{ type: 'text', text: 'Old' }] })
+  assert.equal(doc.h, 640)
+  assert.equal(doc.fx.opening, 'none')
+  assert.equal(doc.elements[0].anim, 'none')
+})
+
+test('every ready-made template opens in the designer', async () => {
+  const { classicToCanvas } = await import('../src/lib/classicToCanvas')
+  const { TEMPLATES } = await import('../src/lib/types')
+  for (const t of TEMPLATES) {
+    const doc = classicToCanvas(t.content, t.design)
+    assert.ok(doc.elements.length >= 6, `${t.id} has elements`)
+    assert.ok(doc.h >= 640 && doc.h <= 2560, `${t.id} height`)
+    assert.ok(doc.elements.every((e) => e.y + e.h <= doc.h + 1), `${t.id} fits on the card`)
+    assert.deepEqual(sanitizeCanvas(doc), doc, `${t.id} is already valid`)
+  }
+})

@@ -61,22 +61,12 @@ const User = ({}) => {
                                 {viewer.name}
                             </div>
                             <div className="mt-1 text-caption text-t-secondary">
-                                {viewer.premium
-                                    ? "Premium"
-                                    : "Free plan"}{" "}
-                                · {viewer.credits} link
-                                {viewer.credits === 1 ? "" : "s"}
+                                {viewer.phone}
                             </div>
                         </div>
                     </div>
                     {[
-                        ...navigationUser.filter(
-                            (link) =>
-                                !(
-                                    viewer.premium &&
-                                    link.title === "Upgrade to Premium"
-                                )
-                        ),
+                        ...navigationUser,
                         ...(viewer.isAdmin
                             ? [{ title: "Admin", icon: "lock", href: "/admin" }]
                             : []),

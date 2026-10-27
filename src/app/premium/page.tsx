@@ -5,7 +5,7 @@ import Shell from '@/components/dawat/Shell'
 import BuyButton from '@/components/dawat/BuyButton'
 import FaqList from '@/components/dawat/FaqList'
 import { paymentMode, safeReturn } from '@/lib/payments'
-import { PRODUCTS, rupees, type Product } from '@/lib/pricing'
+import { FREE_MODE, PRODUCTS, rupees, type Product } from '@/lib/pricing'
 import { getViewer } from '@/lib/viewer'
 
 export const metadata = { title: 'Plans and prices — Dawatnama' }
@@ -26,6 +26,18 @@ const Notice = ({ cls, children }: { cls: string; children: React.ReactNode }) =
 export default async function Plans({ searchParams }: { searchParams: Promise<{ result?: string; return?: string; from?: string }> }) {
   const sp = await searchParams
   const viewer = await getViewer()
+  if (FREE_MODE) return (
+    <Shell title="Plans" viewer={viewer}>
+      <div className="card">
+        <div className="pt-20 pb-24 text-center max-md:py-14">
+          <div className="flex items-center justify-center size-16 mx-auto mb-6 rounded-full bg-primary-02/15"><Icon className="fill-primary-02" name="check" /></div>
+          <div className="mb-2 text-h4 max-md:text-h5">Everything is free</div>
+          <div className="max-w-120 mx-auto mb-8 text-sub-title-1 text-t-tertiary">Every design tool, animations, the designer, guest links and card links. Nothing to buy.</div>
+          <Button isBlack as="link" href={safeReturn(sp.return) || '/templates'}>{sp.return ? 'Back to your card' : 'Make a card'}</Button>
+        </div>
+      </div>
+    </Shell>
+  )
   const premium = Boolean(viewer?.premium)
   const credits = viewer?.credits ?? 0
   const mode = paymentMode()

@@ -1,6 +1,6 @@
 'use client'
 import { useState } from 'react'
-import Item from '@/templates/UpgradeToProPage/Faq/Item'
+import Item from './FaqItem'
 
 /** Questions and answers in the kit's FAQ accordion. */
 export default function FaqList({ items }: { items: [string, string][] }) {

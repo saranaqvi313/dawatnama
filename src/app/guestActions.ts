@@ -2,6 +2,7 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { normalizePhone } from '@/lib/identity'
+import { FREE_MODE } from '@/lib/pricing'
 import { slugProblem, toSlug, RESERVED_SLUGS } from '@/lib/slug'
 
 export type GuestInput = { name: string; phone?: string; party_size?: number; events?: string[] }
@@ -71,7 +72,7 @@ export async function deleteGuests(ids: string[]): Promise<Result> {
 export async function activateGuests(ids: string[]): Promise<Result<{ used: number }>> {
   const supabase = await createClient()
   const { data, error } = await supabase.rpc('activate_guest_links', { p_guest_ids: ids.slice(0, 500) })
-  if (error?.message.includes('not_enough_credits')) return { ok: false, error: 'Not enough guest links. Buy more to make these live.' }
+  if (error?.message.includes('not_enough_credits')) return { ok: false, error: FREE_MODE ? 'The database is still in paid mode. Run supabase/free_mode.sql in Supabase (SQL editor) once.' : 'Not enough guest links. Buy more to make these live.' }
   if (error) return { ok: false, error: error.message }
   return { ok: true, data: { used: Number(data) || 0 } }
 }
@@ -80,7 +81,7 @@ export async function activateGuests(ids: string[]): Promise<Result<{ used: numb
 export async function activateCardLink(invitationId: string): Promise<Result> {
   const supabase = await createClient()
   const { error } = await supabase.rpc('activate_card_link', { p_invitation_id: invitationId })
-  if (error?.message.includes('not_enough_credits')) return { ok: false, error: 'You have no guest links left. Buy a link to unlock this card.' }
+  if (error?.message.includes('not_enough_credits')) return { ok: false, error: FREE_MODE ? 'The database is still in paid mode. Run supabase/free_mode.sql in Supabase (SQL editor) once.' : 'You have no guest links left. Buy a link to unlock this card.' }
   return error ? { ok: false, error: error.message } : { ok: true }
 }
 

@@ -3,6 +3,13 @@
  * browser only displays them. Override a price with the env vars named in each product
  * (set the NEXT_PUBLIC_ one so the site shows the same price).
  */
+/**
+ * Free mode: everything is free (design tools, designer, guest links, card links) and the
+ * payment pages are hidden. On by default. Set NEXT_PUBLIC_FREE_MODE=off in Vercel (and switch
+ * it off in the database, see supabase/free_mode.sql) to start charging again.
+ */
+export const FREE_MODE = (process.env.NEXT_PUBLIC_FREE_MODE ?? 'on').toLowerCase() !== 'off'
+
 export type ProductId = 'premium' | 'links1' | 'links5' | 'links20' | 'shaadi'
 export type Product = { id: ProductId; name: string; price: number; credits: number; premium: boolean; blurb: string }
 

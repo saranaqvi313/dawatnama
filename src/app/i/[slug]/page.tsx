@@ -4,7 +4,7 @@ import InvitationView from '@/components/dawat/InvitationView'
 import CanvasPage from '@/components/dawat/canvas/CanvasPage'
 import { sanitizeCanvas } from '@/lib/canvas'
 import { loadPublicCard } from '@/lib/publicCard'
-import { normalize } from '@/lib/types'
+import { normalize, type EventItem } from '@/lib/types'
 
 type Props = { params: Promise<{ slug: string }> }
 
@@ -30,7 +30,8 @@ export default async function InvitationPage({ params }: Props) {
   const found = await loadPublicCard(slug)
   if (!found) notFound()
   const { card, guest, canReply } = found
-  if (card.kind === 'canvas') return <CanvasPage doc={sanitizeCanvas(card.canvas)} guest={guest} slug={slug} canReply={canReply} invitationId={card.id} />
+  if (card.kind === 'canvas') return <CanvasPage doc={sanitizeCanvas(card.canvas)} guest={guest} slug={slug} canReply={canReply} invitationId={card.id} title={String((card.content as { name1?: string } | null)?.name1 ?? '')}
+    events={Array.isArray((card.content as { events?: unknown } | null)?.events) ? ((card.content as { events: EventItem[] }).events.filter((e) => e && typeof e.name === 'string' && e.name.trim())) : []} />
   const { content, design } = normalize(card.content as never, card.design as never, card.template)
   return (
     <div className="full">

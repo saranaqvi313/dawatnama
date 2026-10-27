@@ -8,6 +8,7 @@ import TableRow from '@/components/TableRow'
 import CardThumb from '@/components/dawat/CardThumb'
 import RecentReplies from '@/components/dawat/RecentReplies'
 import { loadMyCards } from '@/lib/myCards'
+import { FREE_MODE } from '@/lib/pricing'
 import { createClient } from '@/lib/supabase/server'
 import { getViewer } from '@/lib/viewer'
 
@@ -20,7 +21,7 @@ export default async function GuestsOverview() {
   const { cards, replies, totals } = await loadMyCards(await createClient(), viewer.id)
   const stats = [
     ['Guests', totals.guests, `${totals.people} people`],
-    ['Links live', totals.guestsLive, `${viewer.credits} link${viewer.credits === 1 ? '' : 's'} left to use`],
+    ['Links live', totals.guestsLive, FREE_MODE ? 'ready to send' : `${viewer.credits} link${viewer.credits === 1 ? '' : 's'} left to use`],
     ['Replies', totals.replies, `${totals.coming} people coming`],
     ['Opens', totals.opens, `${totals.opened} opened their card`],
   ] as const
@@ -28,7 +29,7 @@ export default async function GuestsOverview() {
     <Shell title="Guests" viewer={viewer}>
       <div className="flex max-lg:block">
         <div className="col-left">
-          <Card title="Guests overview" headContent={<Button className="mr-1" isBlack as="link" href="/premium?return=/guests">Buy links</Button>}>
+          <Card title="Guests overview" headContent={FREE_MODE ? undefined : <Button className="mr-1" isBlack as="link" href="/premium?return=/guests">Buy links</Button>}>
             <div className="grid grid-cols-4 gap-3 p-2 pt-0 max-2xl:grid-cols-2">
               {stats.map(([label, value, note]) => (
                 <div key={label} className="p-5 rounded-3xl border border-s-subtle bg-b-depth2 max-md:p-4">

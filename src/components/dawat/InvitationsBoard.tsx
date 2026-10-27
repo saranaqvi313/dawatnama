@@ -23,10 +23,10 @@ const views = [
 const status = (c: CardRow) => (c.published ? <div className="label label-green">Live</div> : <div className="label label-gray">Draft</div>)
 
 /** The person's cards, in the kit's "Released products" layout (list or grid, search, bulk delete). */
-export default function InvitationsBoard({ cards, title = 'Invitations', compact, siteUrl }: { cards: CardRow[]; title?: string; compact?: boolean; siteUrl: string }) {
+export default function InvitationsBoard({ cards, title = 'Invitations', compact, siteUrl, grid }: { cards: CardRow[]; title?: string; compact?: boolean; siteUrl: string; grid?: boolean }) {
   const router = useRouter()
   const [search, setSearch] = useState('')
-  const [view, setView] = useState(views[1])
+  const [view, setView] = useState(grid ? views[0] : views[1])
   const [selected, setSelected] = useState<string[]>([])
   const [error, setError] = useState('')
   const [pending, start] = useTransition()
@@ -47,6 +47,7 @@ export default function InvitationsBoard({ cards, title = 'Invitations', compact
   const actions = (c: CardRow) => (
     <>
       <Link className="action" href={c.editHref}><Icon name="edit" />Edit</Link>
+      {c.kind === 'canvas' && <Link className="action" href={`/design/${c.id}/preview`} target="_blank"><Icon name="video" />Preview</Link>}
       <Link className="action" href={`/dashboard/${c.id}/guests`}><Icon name="profile" />Guests</Link>
       {c.published && <a className="action" href={`/${c.slug}`} target="_blank" rel="noreferrer"><Icon name="arrow-up-right" />View</a>}
       <DeleteItems onDelete={() => remove([c.id])} content={`This will delete "${c.title}", its guest list and replies. Live links stop working and used links are not refunded. This cannot be undone.`} />
@@ -80,8 +81,8 @@ export default function InvitationsBoard({ cards, title = 'Invitations', compact
       {cards.length === 0 ? (
         <div className="pt-16 pb-20 text-center max-md:py-12">
           <div className="inline-block mb-2 text-h4">No invitations yet</div>
-          <div className="mb-8 text-sub-title-1 text-t-tertiary">Pick a template to make your first card. It&apos;s free.</div>
-          <Button isBlack as="link" href="/templates">Choose a template</Button>
+          <div className="mb-8 text-sub-title-1 text-t-tertiary">Pick a design or start from a blank card. It&apos;s free.</div>
+          <Button isBlack as="link" href="/templates">Make my first card</Button>
         </div>
       ) : shown.length === 0 ? (
         <NoFound title="No invitations found" />

@@ -33,4 +33,4 @@ export async function middleware(request: NextRequest) {
   return response
 }
 
-export const config = { matcher: ['/', '/dashboard/:path*', '/design/:path*', '/invitations/:path*', '/guests/:path*', '/settings/:path*', '/designs', '/login/:path*', '/auth/:path*', '/templates', '/premium/:path*', '/admin/:path*', '/api/pay/:path*', '/api/me'] }
+export const config = { matcher: ['/', '/dashboard/:path*', '/design/:path*', '/invitations/:path*', '/guests/:path*', '/settings/:path*', '/login/:path*', '/auth/:path*', '/templates', '/premium/:path*', '/admin/:path*', '/api/pay/:path*', '/api/me'] }

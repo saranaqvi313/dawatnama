@@ -34,14 +34,28 @@ const interDisplay = localFont({
     variable: "--font-inter-display",
 });
 
-const site =
-    process.env.NEXT_PUBLIC_SITE_URL ||
-    (process.env.VERCEL_PROJECT_PRODUCTION_URL
-        ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
-        : "http://localhost:3000");
+/** The site's address for link previews. A wrong NEXT_PUBLIC_SITE_URL (e.g. no https://) must not break the build. */
+function siteBase(): URL {
+    const tries = [
+        process.env.NEXT_PUBLIC_SITE_URL,
+        process.env.VERCEL_PROJECT_PRODUCTION_URL &&
+            `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`,
+        "http://localhost:3000",
+    ];
+    for (const t of tries) {
+        if (!t) continue;
+        try {
+            const u = new URL(/^https?:\/\//.test(t) ? t : `https://${t}`);
+            if (u.hostname.includes(".") || u.hostname === "localhost") return u;
+        } catch {
+            /* try the next one */
+        }
+    }
+    return new URL("http://localhost:3000");
+}
 
 export const metadata: Metadata = {
-    metadataBase: new URL(site),
+    metadataBase: siteBase(),
     title: "Dawatnama — Digital invitations for Pakistan",
     description:
         "Animated shadi cards and event invitations with RSVP. Pick a template, make it yours, share your link on WhatsApp.",

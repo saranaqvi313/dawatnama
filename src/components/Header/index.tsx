@@ -5,11 +5,7 @@ import { usePathname } from "next/navigation";
 import Button from "@/components/Button";
 import Select from "@/components/Select";
 import Logo from "@/components/Logo";
-import Icon from "@/components/Icon";
-import SearchGlobal from "./SearchGlobal";
 import User from "./User";
-import Notifications from "./Notifications";
-import Messages from "./Messages";
 
 const times = [
     { id: 1, name: "Publish now" },
@@ -35,13 +31,8 @@ const Header = ({
     const [time, setTime] = useState(times[0]);
     const pathname = usePathname();
     const [hasOverflowHidden, setHasOverflowHidden] = useState(false);
-    const [visibleSearch, setVisibleSearch] = useState(false);
 
     const isHideCreateButton =
-        pathname.includes("/customers/customer-list/") ||
-        pathname.includes("/income/refunds/") ||
-        pathname.includes("/shop/") ||
-        pathname.includes("/notifications") ||
         pathname === "/templates" ||
         pathname === "/login";
 
@@ -106,43 +97,26 @@ const Header = ({
                     </div>
                 )}
                 <div
-                    className={`flex items-center gap-3 ${
+                    className={`flex items-center gap-3 ml-auto ${
                         newProduct ? "hidden max-md:flex" : ""
                     } ${
-                        hideSidebar ? "grow max-lg:grow-0 max-lg:ml-auto" : ""
+                        hideSidebar ? "grow justify-end max-lg:grow-0 max-lg:ml-auto" : ""
                     }`}
                 >
                     {!newProduct && (
                         <>
-                            <SearchGlobal
-                                className={`max-md:hidden ${
-                                    hideSidebar ? "mr-auto" : ""
-                                }`}
-                                onClose={() => setVisibleSearch(false)}
-                                visible={visibleSearch}
-                            />
                             {!isHideCreateButton && (
                                 <Button
-                                    className="max-md:hidden"
+                                    className="max-md:!h-10 max-md:!px-4"
                                     isBlack
                                     href="/templates"
                                     as="link"
                                 >
-                                    Create
+                                    New card
                                 </Button>
                             )}
                         </>
                     )}
-                    <Button
-                        className="!hidden max-lg:!flex max-md:!hidden"
-                        isWhite
-                        isCircle
-                        onClick={() => setVisibleSearch(true)}
-                    >
-                        <Icon name="search" />
-                    </Button>
-                    <Notifications />
-                    <Messages />
                     <User />
                 </div>
                 {newProduct && (

@@ -2,10 +2,11 @@
 import type { CSSProperties } from 'react'
 import { OpenTracker, RsvpForm, type CardGuest } from '../InvitationView'
 import { cardText } from '@/lib/i18n'
+import type { EventItem } from '@/lib/types'
 
 /** Under a designer card: greets the guest, counts the open, and takes the RSVP. */
-export default function CanvasGuestPanel({ guest, slug, canReply, invitationId, colors }: {
-  guest: CardGuest | null; slug: string; canReply: boolean; invitationId: string; colors: { bg: string; ink: string; accent: string }
+export default function CanvasGuestPanel({ guest, slug, canReply, invitationId, colors, events = [] }: {
+  guest: CardGuest | null; slug: string; canReply: boolean; invitationId: string; colors: { bg: string; ink: string; accent: string }; events?: EventItem[]
 }) {
   const t = cardText.en
   return (
@@ -15,7 +16,7 @@ export default function CanvasGuestPanel({ guest, slug, canReply, invitationId, 
       {canReply && (
         <>
           <h3>{t.rsvp}</h3>
-          <RsvpForm invitationId={invitationId} t={t} events={[]} guest={guest} slug={slug} />
+          <RsvpForm invitationId={invitationId} t={t} events={(guest?.events?.length ? events.filter((e) => guest.events.includes(e.name)) : events).map((e) => e.name)} guest={guest} slug={slug} />
         </>
       )}
     </section>

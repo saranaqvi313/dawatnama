@@ -8,7 +8,7 @@ import Button from '@/components/Button'
 import Icon from '@/components/Icon'
 import { changePassword, updateName } from '@/app/settings/actions'
 import { PASSWORD_RULES } from '@/lib/password'
-import { PRODUCTS, rupees } from '@/lib/pricing'
+import { FREE_MODE, PRODUCTS, rupees } from '@/lib/pricing'
 import type { Viewer } from '@/lib/viewer'
 
 const ElementWithOffset = ({ className, name, children }: { className?: string; name: string; children: ReactNode }) => (
@@ -22,7 +22,7 @@ const Msg = ({ m }: { m: { ok: boolean; text: string } | null }) =>
   m ? <div className={`label ${m.ok ? 'label-green' : 'label-red'} !h-auto py-1.5 !leading-normal self-start`} role={m.ok ? 'status' : 'alert'}>{m.text}</div> : null
 
 const navigation = [
-  { title: 'Your plan', icon: 'wallet', description: 'Premium and guest links', to: 'plan' },
+  ...(FREE_MODE ? [] : [{ title: 'Your plan', icon: 'wallet', description: 'Premium and guest links', to: 'plan' }]),
   { title: 'Security', icon: 'lock', description: 'Change password', to: 'security' },
   { title: 'Help', icon: 'help', description: 'Contact us, terms and refunds', to: 'help' },
 ]
@@ -106,6 +106,7 @@ export default function SettingsView({ viewer, legacyPassword }: { viewer: Viewe
           </Card>
         </ElementWithOffset>
 
+        {!FREE_MODE && (
         <ElementWithOffset name="plan">
           <Card title="Your plan" headContent={<span className={`mr-3 label ${viewer.premium ? 'label-green' : 'label-gray'}`}>{viewer.premium ? 'Premium' : 'Free'}</span>}>
             <div className="px-5 max-lg:px-3">
@@ -125,6 +126,7 @@ export default function SettingsView({ viewer, legacyPassword }: { viewer: Viewe
             </div>
           </Card>
         </ElementWithOffset>
+        )}
 
         <ElementWithOffset name="security">
           <Card title="Password">

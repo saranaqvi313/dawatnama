@@ -1,27 +1,25 @@
-import Button from '@/components/Button'
 import Shell from '@/components/dawat/Shell'
-import TemplateGrid from '@/components/dawat/TemplateGrid'
-import { dict } from '@/lib/i18n'
-import { getLang } from '@/lib/supabase/server'
+import PublicShell from '@/components/dawat/PublicShell'
+import TemplatesGallery from '@/components/dawat/TemplatesGallery'
+import { getViewer } from '@/lib/viewer'
 
-export const metadata = { title: 'Templates — Dawatnama' }
+export const metadata = { title: 'Templates — Dawatnama', description: 'Wedding and event invitation templates. Edit any of them for free, or start from a blank card.' }
 
 export default async function Templates() {
-  const t = dict[await getLang()]
+  const viewer = await getViewer()
+  if (viewer)
+    return (
+      <Shell title="New card" viewer={viewer}>
+        <div className="card px-8 py-8 max-lg:px-5 max-md:px-3 max-md:py-5"><TemplatesGallery /></div>
+      </Shell>
+    )
   return (
-    <Shell title="Templates">
-      <div className="card">
-        <div className="flex items-center flex-wrap gap-3 pl-5 max-lg:pl-3">
-          <div className="mr-auto">
-            <div className="text-h6">{t.tplTitle}</div>
-            <div className="text-body-2 text-t-secondary">{t.tplSub}</div>
-          </div>
-          <Button isStroke as="link" href="/designs">Designer cards</Button>
-        </div>
-        <div className="p-5 pt-3 max-lg:p-3">
-          <TemplateGrid />
-        </div>
+    <PublicShell viewer={null}>
+      <div className="max-w-300 mx-auto px-6 pt-6 max-md:px-4">
+        <h1 className="mb-2 text-h3 max-md:text-h4">Choose a card to start</h1>
+        <p className="max-w-160 mb-10 text-body-1 text-t-secondary">Every card is free to make and share. Change names, dates, colours and photos, add music, video and fairy-tale animations.</p>
+        <TemplatesGallery />
       </div>
-    </Shell>
+    </PublicShell>
   )
 }

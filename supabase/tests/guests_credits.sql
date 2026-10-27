@@ -9,6 +9,8 @@ begin
   raise exception 'FAIL [%]: was allowed', label;
 end $$;
 grant execute on all functions in schema pg_temp to public;
+-- These tests check paid mode (free mode is tested in free_mode.sql).
+update public.app_settings set value = 'false'::jsonb where key = 'free_mode';
 
 insert into auth.users values ('00000000-0000-0000-0000-0000000000a1'), ('00000000-0000-0000-0000-0000000000b2');
 

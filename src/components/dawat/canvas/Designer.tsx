@@ -1,5 +1,5 @@
 'use client'
-import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type PointerEvent as RPointerEvent, type ReactNode, type RefObject } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type DragEvent, type PointerEvent as RPointerEvent, type ReactNode, type RefObject } from 'react'
 import Link from 'next/link'
 import Button from '@/components/Button'
 import Icon from '@/components/Icon'
@@ -10,10 +10,15 @@ import QrButton from '../QrButton'
 import { uploadMedia } from '@/lib/upload'
 import LinkNameField from '../LinkNameField'
 import {
-  CANVAS_FONTS, CH, CW, MAX_ELEMENTS, ORNAMENTS, PATTERNS, createElement, newId,
-  type AddKind, type CanvasBg, type CanvasDoc, type CanvasEl, type FontKey, type ImageEl, type OrnamentEl, type ShapeEl, type TextEl,
+  ANIMS, ANIM_LABEL, CANVAS_FONTS, CH, CW, EFFECTS, EFFECT_LABEL, FILTERS, MASKS, MAX_ELEMENTS, MAX_H, MIN_H, OPENINGS, OPENING_LABEL, ORNAMENTS, PATTERNS,
+  SCENE_LABEL, SCENE_NAMES, createElement, newId,
+  type AddKind, type AnimName, type CanvasBg, type CanvasDoc, type CanvasEl, type CanvasFx, type FontKey, type ImageEl, type OrnamentEl, type SceneEl, type ShapeEl, type TextEl, type VideoEl,
 } from '@/lib/canvas'
-import { backgroundStyle, elementBox, ElementBody } from './CanvasCard'
+import { animProps, BackgroundPhoto, backgroundStyle, elementBox, ElementBody } from './CanvasCard'
+import Effects from '../Effects'
+import Scene from '../Scene'
+import { videoEmbed } from '@/lib/media'
+import { FREE_MODE } from '@/lib/pricing'
 import OrnamentSvg from './OrnamentSvg'
 
 type Props = { invitationId: string; userId: string; slug: string; siteUrl: string; initial: CanvasDoc; initialTitle: string; initialPublished: boolean; sharePaid: boolean; credits: number; payResult?: string }
@@ -33,8 +38,10 @@ const isLight = (c: string) => {
   return r * 0.299 + g * 0.587 + b * 0.114 > 150
 }
 
-const ADD_TEXT: [AddKind, string][] = [['heading', 'Heading'], ['script', 'Names (script)'], ['text', 'Paragraph']]
-const ADD_SHAPES: [AddKind, string][] = [['shape:rect', 'Rectangle'], ['shape:circle', 'Circle'], ['shape:line', 'Line'], ['shape:arch', 'Arch frame']]
+const ADD_TEXT: [AddKind, string][] = [['heading', 'Heading'], ['script', 'Names (script)'], ['text', 'Paragraph'], ['label', 'Small caps line'], ['date', 'Date & venue']]
+const ADD_SHAPES: [AddKind, string][] = [['shape:rect', 'Rectangle'], ['shape:circle', 'Circle'], ['shape:line', 'Line'], ['shape:arch', 'Arch frame'], ['shape:heart', 'Heart'], ['shape:star', 'Star']]
+const FILTER_LABEL: Record<string, string> = { none: 'Original', warm: 'Warm', cool: 'Cool', bw: 'Black & white', sepia: 'Vintage', soft: 'Soft', vivid: 'Vivid' }
+const MASK_LABEL: Record<string, string> = { none: 'Corners', circle: 'Circle', arch: 'Arch', heart: 'Heart', blob: 'Blob' }
 const ORNAMENT_LABEL: Record<string, string> = { mandala: 'Mandala', divider: 'Divider', corner: 'Corner', lantern: 'Lantern', crescent: 'Crescent', leaf: 'Leaves', flower: 'Flower', star: 'Star' }
 
 export default function Designer({ invitationId, userId, slug, siteUrl, initial, initialTitle, initialPublished, sharePaid: paid0, credits: credits0, payResult }: Props) {
@@ -48,7 +55,9 @@ export default function Designer({ invitationId, userId, slug, siteUrl, initial,
   const [status, setStatus] = useState(payResult ? PAY_MESSAGES[payResult] ?? '' : '')
   const [busyBtn, setBusyBtn] = useState<'save' | 'publish' | ''>('')
   const [saving, setSaving] = useState(false)
-  const [panel, setPanel] = useState<'add' | 'element' | 'background' | 'layers' | 'share'>(payResult ? 'share' : 'add')
+  const [panel, setPanel] = useState<'add' | 'element' | 'background' | 'magic' | 'layers' | 'share'>(payResult ? 'share' : 'add')
+  const [playKey, setPlayKey] = useState(0)
+  const [playing, setPlaying] = useState(false)
   const [guides, setGuides] = useState<{ v: boolean; h: boolean }>({ v: false, h: false })
   const [fitScale, setFitScale] = useState(1)
   const [zoom, setZoom] = useState(1)
@@ -64,6 +73,7 @@ export default function Designer({ invitationId, userId, slug, siteUrl, initial,
   const textBox = useRef<HTMLTextAreaElement>(null)
 
   const scale = fitScale * zoom
+  const H = doc.h || CH
   const sel = doc.elements.find((e) => e.id === selected) ?? null
   const [linkSlug, setLinkSlug] = useState(slug)
   const link = `${siteUrl}/${linkSlug}`
@@ -108,6 +118,9 @@ export default function Designer({ invitationId, userId, slug, siteUrl, initial,
     commit({ ...d, elements: d.elements.map((e) => (e.id === id ? ({ ...e, ...patch } as CanvasEl) : e)) }, coalesce ? `${id}:${coalesce}` : undefined)
   }, [commit])
   const updateBg = (patch: Partial<CanvasBg>, coalesce?: string) => commit({ ...docRef.current, bg: { ...docRef.current.bg, ...patch } }, coalesce ? `bg:${coalesce}` : undefined)
+  const updateFx = (patch: Partial<CanvasFx>, coalesce?: string) => commit({ ...docRef.current, fx: { ...docRef.current.fx, ...patch } }, coalesce ? `fx:${coalesce}` : undefined)
+  const setHeight = (h: number) => commit({ ...docRef.current, h: Math.round(clamp(h, MIN_H, MAX_H)) }, 'height')
+  const playAnimations = () => { setPlaying(true); setPlayKey((k) => k + 1); window.setTimeout(() => setPlaying(false), 6000) }
 
   // ---- element operations ----------------------------------------------------------------
   const add = (kind: AddKind, at?: { x: number; y: number }) => {
@@ -141,7 +154,7 @@ export default function Designer({ invitationId, userId, slug, siteUrl, initial,
   }
   const centre = (id: string, axis: 'x' | 'y') => {
     const el = docRef.current.elements.find((e) => e.id === id)
-    if (el) updateEl(id, axis === 'x' ? { x: round((CW - el.w) / 2) } : { y: round((CH - el.h) / 2) })
+    if (el) updateEl(id, axis === 'x' ? { x: round((CW - el.w) / 2) } : { y: round(((docRef.current.h || CH) - el.h) / 2) })
   }
 
   // ---- fit the card to the screen ---------------------------------------------------------
@@ -175,11 +188,12 @@ export default function Designer({ invitationId, userId, slug, siteUrl, initial,
       let y = d.oy + (e.clientY - d.sy) / scale
       if (!e.altKey) {
         if (Math.abs(x + el.w / 2 - CW / 2) < SNAP) { x = CW / 2 - el.w / 2; g.v = true }
-        if (Math.abs(y + el.h / 2 - CH / 2) < SNAP) { y = CH / 2 - el.h / 2; g.h = true }
+        const HH = cur.h || CH
+        if (Math.abs(y + el.h / 2 - HH / 2) < SNAP) { y = HH / 2 - el.h / 2; g.h = true }
         if (Math.abs(x) < SNAP) x = 0
         if (Math.abs(x + el.w - CW) < SNAP) x = CW - el.w
         if (Math.abs(y) < SNAP) y = 0
-        if (Math.abs(y + el.h - CH) < SNAP) y = CH - el.h
+        if (Math.abs(y + el.h - HH) < SNAP) y = HH - el.h
       }
       patch = { x: round(x), y: round(y) }
     } else if (d.mode === 'resize') {
@@ -302,12 +316,27 @@ export default function Designer({ invitationId, userId, slug, siteUrl, initial,
     return true
   }
 
-  async function upload(file: File | undefined, apply: (url: string) => void) {
+  async function upload(file: File | undefined, apply: (url: string) => void, kind: 'image' | 'video' = 'image') {
     if (!file) return
-    setStatus('Shrinking and uploading image…')
+    setStatus(kind === 'video' ? 'Uploading video…' : 'Shrinking and uploading image…')
     try {
-      apply(await uploadMedia(file, userId, `canvas-${invitationId}`))
-      setStatus('Image added.')
+      apply(await uploadMedia(file, userId, `canvas-${invitationId}`, kind))
+      setStatus(kind === 'video' ? 'Video added.' : 'Image added.')
+    } catch (e) { setStatus((e as Error).message) }
+  }
+  async function uploadMusic(file: File | undefined) {
+    if (!file) return
+    if (!/^audio\//.test(file.type)) return setStatus('Please choose an MP3 or other audio file.')
+    if (file.size > 12 * 1024 * 1024) return setStatus('Music must be under 12 MB.')
+    setStatus('Uploading music…')
+    try {
+      const { createClient } = await import('@/lib/supabase/client')
+      const sb = createClient()
+      const path = `${userId}/music-${invitationId}-${Date.now()}.${(file.name.split('.').pop() || 'mp3').replace(/[^a-z0-9]/gi, '').slice(0, 5)}`
+      const { error } = await sb.storage.from('photos').upload(path, file, { contentType: file.type, cacheControl: '31536000' })
+      if (error) throw new Error(`Upload failed: ${error.message}`)
+      updateFx({ music: sb.storage.from('photos').getPublicUrl(path).data.publicUrl })
+      setStatus('Music added. It plays when the guest opens the card.')
     } catch (e) { setStatus((e as Error).message) }
   }
 
@@ -326,7 +355,7 @@ export default function Designer({ invitationId, userId, slug, siteUrl, initial,
         </header>
 
         <nav className="dz-tabs" role="tablist">
-          {([['add', 'Add'], ['element', 'Edit'], ['background', 'Background'], ['layers', 'Layers'], ['share', 'Share']] as const).map(([k, l]) => (
+          {([['add', 'Add'], ['element', 'Edit'], ['background', 'Background'], ['magic', 'Magic'], ['layers', 'Layers'], ['share', 'Share']] as const).map(([k, l]) => (
             <button key={k} role="tab" aria-selected={panel === k} className={panel === k ? 'on' : ''} onClick={() => setPanel(k)}>{l}</button>
           ))}
         </nav>
@@ -340,8 +369,21 @@ export default function Designer({ invitationId, userId, slug, siteUrl, initial,
                   {ADD_TEXT.map(([k, l]) => <button key={k} className="dz-tile" {...draggable(k)} onClick={() => add(k)}><span className={`dz-sample ${k}`}>Aa</span>{l}</button>)}
                 </div>
               </Section>
-              <Section title="Photo">
-                <button className="dz-tile wide" {...draggable('image')} onClick={() => add('image')}><span className="dz-sample image" />Photo frame</button>
+              <Section title="Photo and video">
+                <div className="dz-grid">
+                  <button className="dz-tile" {...draggable('image')} onClick={() => add('image')}><span className="dz-sample image" />Photo</button>
+                  <button className="dz-tile" {...draggable('video')} onClick={() => add('video')}><span className="dz-sample video">▶</span>Video</button>
+                </div>
+              </Section>
+              <Section title="Fairy-tale scenes">
+                <div className="dz-grid">
+                  {SCENE_NAMES.map((n) => (
+                    <button key={n} className="dz-tile" {...draggable(`scene:${n}`)} onClick={() => add(`scene:${n}`)}>
+                      <span className="dz-scene" style={{ '--accent': accent, '--bg': doc.bg.color, '--ink': ink, background: doc.bg.color } as CSSProperties}><span className="scene-mini"><Scene kind={n} /></span></span>
+                      {SCENE_LABEL[n]}
+                    </button>
+                  ))}
+                </div>
               </Section>
               <Section title="Shapes">
                 <div className="dz-grid">
@@ -363,7 +405,7 @@ export default function Designer({ invitationId, userId, slug, siteUrl, initial,
           {panel === 'element' && !sel && <p className="muted">Click any element on the card to edit it.</p>}
           {panel === 'element' && sel && (
             <ElementPanel el={sel} textBox={textBox} update={(p, c) => updateEl(sel.id, p, c)}
-              onUpload={(f) => upload(f, (url) => updateEl(sel.id, { src: url } as Partial<ImageEl>))}
+              onUpload={(f) => upload(f, (url) => updateEl(sel.id, { src: url } as Partial<ImageEl>), sel.type === 'video' ? 'video' : 'image')}
               onDelete={() => remove(sel.id)} onDuplicate={() => duplicate(sel.id)}
               onOrder={(d) => reorder(sel.id, d)} onCentre={(a) => centre(sel.id, a)} />
           )}
@@ -387,7 +429,68 @@ export default function Designer({ invitationId, userId, slug, siteUrl, initial,
                 <label className="file">{doc.bg.image ? 'Replace photo' : 'Upload a photo'}
                   <input type="file" accept="image/*" onChange={(e) => upload(e.target.files?.[0], (url) => updateBg({ image: url }))} />
                 </label>
-                {doc.bg.image && <button type="button" className="link" onClick={() => updateBg({ image: '' })}>Remove photo</button>}
+                {doc.bg.image && (
+                  <>
+                    <label>Photo strength <output>{Math.round((doc.bg.imageOpacity ?? 1) * 100)}%</output>
+                      <input type="range" min={0.05} max={1} step={0.05} value={doc.bg.imageOpacity ?? 1} onChange={(e) => updateBg({ imageOpacity: Number(e.target.value) }, 'imgop')} />
+                    </label>
+                    <button type="button" className="link" onClick={() => updateBg({ image: '' })}>Remove photo</button>
+                  </>
+                )}
+              </Section>
+              <Section title="Card length">
+                <p className="dz-hint">Make the card longer to fit every function, photos and a video. Guests scroll down like a page.</p>
+                <div className="chips">
+                  {[[640, 'Phone screen'], [960, 'Long'], [1280, 'Extra long'], [1920, 'Full story']].map(([v, l]) => (
+                    <button key={v} type="button" className={H === v ? 'on' : ''} onClick={() => setHeight(Number(v))}>{l}</button>
+                  ))}
+                </div>
+                <label>Exact length <output>{H}px</output>
+                  <input type="range" min={MIN_H} max={MAX_H} step={40} value={H} onChange={(e) => setHeight(Number(e.target.value))} />
+                </label>
+              </Section>
+            </>
+          )}
+
+          {panel === 'magic' && (
+            <>
+              <p className="dz-hint">Fairy-tale magic for the whole card. Guests see it when they open your link.</p>
+              <Section title="How the card opens">
+                <div className="chips">
+                  {OPENINGS.map((o) => <button key={o} type="button" className={doc.fx.opening === o ? 'on' : ''} onClick={() => updateFx({ opening: o })}>{OPENING_LABEL[o]}</button>)}
+                </div>
+                <label>Words on the seal<input value={doc.fx.sealText} maxLength={80} placeholder={title || 'Ayesha & Hamza'} onChange={(e) => updateFx({ sealText: e.target.value }, 'seal')} dir="auto" /></label>
+              </Section>
+              <Section title="Floating over the card">
+                <div className="chips">
+                  {EFFECTS.map((o) => <button key={o} type="button" className={doc.fx.effect === o ? 'on' : ''} onClick={() => updateFx({ effect: o })}>{EFFECT_LABEL[o]}</button>)}
+                </div>
+                <label>Colour<input type="color" value={hex6(doc.fx.effectColor)} onChange={(e) => updateFx({ effectColor: e.target.value }, 'fxc')} /></label>
+              </Section>
+              <Section title="Animate everything">
+                <p className="dz-hint">Give every text a gentle entrance, one after another. You can change each one in Edit.</p>
+                <div className="chips">
+                  {(['rise', 'fade', 'blur', 'zoom', 'none'] as AnimName[]).map((a) => (
+                    <button key={a} type="button" onClick={() => {
+                      let i = 0
+                      commit({ ...docRef.current, elements: docRef.current.elements.map((el) => (el.type === 'text' ? { ...el, anim: a, delay: a === 'none' ? 0 : round(0.15 * i++) } : el)) })
+                    }}>{a === 'none' ? 'Remove all' : ANIM_LABEL[a]}</button>
+                  ))}
+                </div>
+                <button type="button" className="link" onClick={playAnimations}>▶ Play animations</button>
+              </Section>
+              <Section title="Background music">
+                {doc.fx.music ? (
+                  <>
+                    <audio controls src={doc.fx.music} style={{ width: '100%' }} />
+                    <button type="button" className="link" onClick={() => updateFx({ music: '' })}>Remove music</button>
+                  </>
+                ) : (
+                  <label className="file">Upload a song (MP3, up to 12 MB)
+                    <input type="file" accept="audio/*" onChange={(e) => uploadMusic(e.target.files?.[0])} />
+                  </label>
+                )}
+                <p className="dz-hint">Music starts when the guest taps to open the card. Choose an opening above so it can play.</p>
               </Section>
             </>
           )}
@@ -461,6 +564,9 @@ export default function Designer({ invitationId, userId, slug, siteUrl, initial,
           <button onClick={() => setZoom((z) => clamp(round(z - 0.1), 0.5, 2))} aria-label="Zoom out">−</button>
           <button onClick={() => setZoom(1)} title="Fit to screen">{Math.round(scale * 100)}%</button>
           <button onClick={() => setZoom((z) => clamp(round(z + 0.1), 0.5, 2))} aria-label="Zoom in">+</button>
+          <span className="dz-sep" />
+          <button onClick={playAnimations} title="Play the animations">▶ Play</button>
+          <a className="dz-preview" href={`/design/${invitationId}/preview`} target="_blank" rel="noreferrer" onClick={() => { void save() }}>Preview ↗</a>
           {sel && (
             <>
               <span className="dz-sep" />
@@ -471,16 +577,18 @@ export default function Designer({ invitationId, userId, slug, siteUrl, initial,
         </div>
         <div className="dz-stage-area" ref={stageArea}
           onPointerDown={(e) => { if (e.target === e.currentTarget) setSelected(null) }}>
-          <div className="dz-stage-wrap" style={{ width: CW * scale, height: CH * scale }}>
-            <div ref={stage} className="dz-stage cv" style={{ ...backgroundStyle(doc.bg), width: CW * scale, height: CH * scale }}
+          <div className="dz-stage-wrap" style={{ width: CW * scale, height: H * scale }}>
+            <div ref={stage} key={playKey} className={`dz-stage cv${playing ? ' cv-play' : ''}`} style={{ ...backgroundStyle(doc.bg), width: CW * scale, height: H * scale, '--cv-bg': doc.bg.color } as CSSProperties}
               onDragOver={(e) => { if (e.dataTransfer.types.includes('application/x-dawat-element')) { e.preventDefault(); e.dataTransfer.dropEffect = 'copy' } }}
               onDrop={onDropAdd}
               onPointerDown={(e) => { if (e.target === e.currentTarget) setSelected(null) }}>
+              <BackgroundPhoto bg={doc.bg} />
+              {doc.fx.effect !== 'none' && <Effects kind={doc.fx.effect} color={doc.fx.effectColor} />}
               {doc.elements.map((el) => (
                 <div key={el.id} className={`dz-el ${el.id === selected ? 'sel' : ''} ${el.locked ? 'locked' : ''}`} style={elementBox(el)}
                   onPointerDown={(e) => onElementDown(e, el)}
                   onDoubleClick={() => { if (el.type === 'text') { setPanel('element'); setTimeout(() => textBox.current?.focus(), 30) } }}>
-                  <ElementBody el={el} />
+                  <div className={`cv-el ${animProps(el).className}`} style={animProps(el).style}><ElementBody el={el} editing /></div>
                   {el.id === selected && !el.locked && (
                     <>
                       {(['nw', 'ne', 'sw', 'se'] as const).map((c) => (
@@ -508,6 +616,8 @@ function layerLabel(el: CanvasEl) {
   if (el.type === 'text') return `T  ${el.text.split('\n')[0].slice(0, 28) || 'Text'}`
   if (el.type === 'image') return '▣  Photo'
   if (el.type === 'shape') return `◇  ${el.shape[0].toUpperCase()}${el.shape.slice(1)}`
+  if (el.type === 'video') return '▶  Video'
+  if (el.type === 'scene') return `☾  ${SCENE_LABEL[el.name]}`
   return `✿  ${ORNAMENT_LABEL[el.name]}`
 }
 
@@ -541,6 +651,25 @@ function ElementPanel({ el, textBox, update, onUpload, onDelete, onDuplicate, on
       {el.type === 'image' && <ImageProps el={el} update={update} onUpload={onUpload} slider={slider} />}
       {el.type === 'shape' && <ShapeProps el={el} update={update} slider={slider} />}
       {el.type === 'ornament' && <OrnamentProps el={el} update={update} />}
+      {el.type === 'video' && <VideoProps el={el} update={update} onUpload={onUpload} />}
+      {el.type === 'scene' && <SceneProps el={el} update={update} />}
+
+      <Section title="Animation">
+        <label>Effect
+          <select value={el.anim} onChange={(e) => update({ anim: e.target.value as AnimName })}>
+            {ANIMS.map((a) => <option key={a} value={a}>{ANIM_LABEL[a]}</option>)}
+          </select>
+        </label>
+        {el.anim !== 'none' && slider('Start after', el.delay, 0, 6, 0.1, (v) => update({ delay: v }, 'delay'), 'delay', 's')}
+      </Section>
+
+      <Section title="Link (optional)">
+        <label>When a guest taps this, open
+          <input value={el.link} placeholder="https://maps.google.com/… or https://wa.me/92300…" dir="ltr"
+            onChange={(e) => update({ link: e.target.value.trim() }, 'link')} />
+        </label>
+        <p className="dz-hint">Use it for directions (Google Maps link), a WhatsApp number or a website.</p>
+      </Section>
 
       <Section title="Position and size">
         <div className="four">{n('X', 'x')}{n('Y', 'y')}{n('Width', 'w')}{n('Height', 'h')}</div>
@@ -587,6 +716,13 @@ function TextProps({ el, textBox, update, slider }: { el: TextEl; textBox: ElPro
       </div>
       {slider('Letter spacing', el.spacing, -2, 12, 0.5, (v) => update({ spacing: v }, 'spacing'), 'spacing')}
       {slider('Line height', el.lineHeight, 0.8, 2.5, 0.05, (v) => update({ lineHeight: v }, 'lh'), 'lh')}
+      <div className="chips">
+        <button type="button" className={el.foil ? 'on' : ''} onClick={() => update({ foil: !el.foil })}>✨ Gold foil</button>
+        <button type="button" className={el.shadow ? 'on' : ''} onClick={() => update({ shadow: !el.shadow })}>Shadow</button>
+        <button type="button" className={el.underline ? 'on' : ''} onClick={() => update({ underline: !el.underline })}><u>U</u></button>
+        <button type="button" className={el.bg !== 'transparent' ? 'on' : ''} onClick={() => update({ bg: el.bg !== 'transparent' ? 'transparent' : '#ffffffcc' })}>Box behind</button>
+      </div>
+      {el.bg !== 'transparent' && <label>Box colour<input type="color" value={hex6(el.bg)} onChange={(e) => update({ bg: e.target.value }, 'tbg')} /></label>}
     </Section>
   )
 }
@@ -605,6 +741,15 @@ function ImageProps({ el, update, onUpload, slider }: { el: ImageEl; update: ElP
         {slider('Border', el.border, 0, 12, 1, (v) => update({ border: v } as Partial<ImageEl>, 'border'), 'border', 'px')}
         <label>Border colour<input type="color" value={hex6(el.borderColor)} onChange={(e) => update({ borderColor: e.target.value } as Partial<ImageEl>, 'bc')} /></label>
       </div>
+      <label>Shape</label>
+      <div className="chips">
+        {MASKS.map((m) => <button key={m} type="button" className={el.mask === m ? 'on' : ''} onClick={() => update({ mask: m } as Partial<ImageEl>)}>{MASK_LABEL[m]}</button>)}
+      </div>
+      <label>Filter</label>
+      <div className="chips">
+        {FILTERS.map((f) => <button key={f} type="button" className={el.filter === f ? 'on' : ''} onClick={() => update({ filter: f } as Partial<ImageEl>)}>{FILTER_LABEL[f]}</button>)}
+      </div>
+      <label className="check"><input type="checkbox" checked={el.shadow} onChange={(e) => update({ shadow: e.target.checked } as Partial<ImageEl>)} />Soft shadow</label>
     </Section>
   )
 }
@@ -622,6 +767,7 @@ function ShapeProps({ el, update, slider }: { el: ShapeEl; update: ElProps['upda
       <label>{line ? 'Colour' : 'Outline colour'}<input type="color" value={hex6(el.stroke)} onChange={(e) => update({ stroke: e.target.value } as Partial<ShapeEl>, 'stroke')} /></label>
       {!line && slider('Outline width', el.strokeWidth, 0, 12, 0.5, (v) => update({ strokeWidth: v } as Partial<ShapeEl>, 'sw'), 'sw', 'px')}
       {el.shape === 'rect' && slider('Rounded corners', el.radius, 0, 80, 1, (v) => update({ radius: v } as Partial<ShapeEl>, 'radius'), 'radius', 'px')}
+      <label className="check"><input type="checkbox" checked={el.shadow} onChange={(e) => update({ shadow: e.target.checked } as Partial<ShapeEl>)} />Soft shadow</label>
     </Section>
   )
 }
@@ -637,6 +783,39 @@ function OrnamentProps({ el, update }: { el: OrnamentEl; update: ElProps['update
         ))}
       </div>
       <label>Colour<input type="color" value={hex6(el.color)} onChange={(e) => update({ color: e.target.value } as Partial<OrnamentEl>, 'color')} /></label>
+    </Section>
+  )
+}
+
+function VideoProps({ el, update, onUpload }: { el: VideoEl; update: ElProps['update']; onUpload: ElProps['onUpload'] }) {
+  const ok = el.src ? videoEmbed(el.src) : null
+  return (
+    <Section title="Video">
+      <label className="file">{el.src && ok?.kind === 'file' ? 'Replace video' : 'Upload a video (MP4, up to 30 MB)'}
+        <input type="file" accept="video/mp4,video/webm,video/quicktime" onChange={(e) => onUpload(e.target.files?.[0])} />
+      </label>
+      <label>Or a YouTube / Vimeo link
+        <input value={el.src} placeholder="https://youtu.be/…" dir="ltr" onChange={(e) => update({ src: e.target.value.trim() } as Partial<VideoEl>, 'vsrc')} />
+      </label>
+      {el.src && !ok && <p className="dz-hint" style={{ color: 'var(--primary-03)' }}>This link can&apos;t be played. Use a YouTube or Vimeo link, or upload an MP4.</p>}
+      <label className="check"><input type="checkbox" checked={el.autoplay} onChange={(e) => update({ autoplay: e.target.checked } as Partial<VideoEl>)} />Play by itself, silent and looping (uploaded videos)</label>
+      <div className="two">
+        <label>Rounded corners <output>{el.radius}%</output><input type="range" min={0} max={50} value={el.radius} onChange={(e) => update({ radius: Number(e.target.value) } as Partial<VideoEl>, 'vr')} /></label>
+        <label>Border colour<input type="color" value={hex6(el.borderColor)} onChange={(e) => update({ borderColor: e.target.value, border: el.border || 2 } as Partial<VideoEl>, 'vbc')} /></label>
+      </div>
+      {el.src && <button type="button" className="link" onClick={() => update({ src: '' } as Partial<VideoEl>)}>Remove video</button>}
+    </Section>
+  )
+}
+
+function SceneProps({ el, update }: { el: SceneEl; update: ElProps['update'] }) {
+  return (
+    <Section title="Fairy-tale scene">
+      <div className="chips">
+        {SCENE_NAMES.map((n) => <button key={n} type="button" className={el.name === n ? 'on' : ''} onClick={() => update({ name: n } as Partial<SceneEl>)}>{SCENE_LABEL[n]}</button>)}
+      </div>
+      <label>Colour<input type="color" value={hex6(el.color)} onChange={(e) => update({ color: e.target.value } as Partial<SceneEl>, 'scol')} /></label>
+      <p className="dz-hint">Scenes move by themselves on the live card: lanterns rise, flowers bloom, butterflies fly.</p>
     </Section>
   )
 }

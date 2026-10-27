@@ -3,6 +3,7 @@ import type { User } from '@supabase/supabase-js'
 import { isAdminUser } from './admin'
 import { displayName } from './premium'
 import { createClient } from './supabase/server'
+import { FREE_MODE } from './pricing'
 
 export type Viewer = {
   id: string
@@ -38,7 +39,7 @@ export async function getViewer(): Promise<Viewer | null> {
     name: name === 'Account' ? phone || name : name,
     phone,
     initials: initialsOf(name === 'Account' ? 'Dawatnama' : name),
-    premium: Boolean(data?.is_premium),
+    premium: FREE_MODE || Boolean(data?.is_premium),
     credits: Math.max(0, Number(data?.link_credits ?? 0)),
     isAdmin: isAdminUser(user),
   }

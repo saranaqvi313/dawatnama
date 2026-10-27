@@ -16,7 +16,7 @@ import DeleteItems from '@/components/DeleteItems'
 import { activateGuests, addGuests, deleteGuests, markReminded, updateGuest } from '@/app/guestActions'
 import { guestStats, invitedTo, replySummary, whatsappHref, type GuestRow, type ReplyRow } from '@/lib/guestStats'
 import { readGuestFile } from '@/lib/sheet'
-import { PRODUCTS, rupees } from '@/lib/pricing'
+import { FREE_MODE, PRODUCTS, rupees } from '@/lib/pricing'
 import QrButton from './QrButton'
 
 type CardInfo = { id: string; slug: string; kind: string; title: string; openLinkLive: boolean; opens: number }
@@ -113,7 +113,7 @@ export default function GuestManager({ card, initialGuests, replies, eventNames,
 
   async function goLive(ids: string[]) {
     const need = guests.filter((g) => ids.includes(g.id) && !g.link_active).length
-    if (need > credits) { setStatus(`You need ${need} guest link${need === 1 ? '' : 's'} and have ${credits}. Buy more first.`); return }
+    if (!FREE_MODE && need > credits) { setStatus(`You need ${need} guest link${need === 1 ? '' : 's'} and have ${credits}. Buy more first.`); return }
     const ok = await run('live', () => activateGuests(ids), (d) => `${(d as { used: number } | undefined)?.used ?? need} link${need === 1 ? ' is' : 's are'} live. Send them on WhatsApp.`)
     if (ok) { setGuests((gs) => gs.map((g) => (ids.includes(g.id) ? { ...g, link_active: true } : g))); setSelected([]) }
   }
@@ -149,14 +149,14 @@ export default function GuestManager({ card, initialGuests, replies, eventNames,
         <div className="flex flex-wrap items-center gap-3 pl-5 max-lg:pl-3">
           <div className="mr-auto min-w-0">
             <div className="text-h6 truncate" dir="auto">{card.title}</div>
-            <div className="text-body-2 text-t-secondary">{credits} guest link{credits === 1 ? '' : 's'} left · {rupees(PRODUCTS.links1.price)} each, less in bundles</div>
+            <div className="text-body-2 text-t-secondary">{FREE_MODE ? 'Guest links are free. Add your guests and send each one their own link.' : `${credits} guest link${credits === 1 ? '' : 's'} left · ${rupees(PRODUCTS.links1.price)} each, less in bundles`}</div>
           </div>
           <Button isStroke as="link" href={editorHref} icon="edit" className="gap-2">Edit card</Button>
           <Button isStroke as="link" href={`/dashboard/${card.id}/rsvps`}>Replies</Button>
-          <Button isBlack as="link" href={buyHref}>Buy links</Button>
+          {!FREE_MODE && <Button isBlack as="link" href={buyHref}>Buy links</Button>}
         </div>
         <div className="grid grid-cols-4 gap-3 p-2 pt-5 max-md:grid-cols-2">
-          {([['Guests', stats.guests, `${stats.people} people`], ['Links live', stats.live, `${credits} left to use`], ['Opened', stats.opened, 'opened their card'], ['Replied', stats.replied, 'sent an RSVP']] as const).map(([label, value, note]) => (
+          {([['Guests', stats.guests, `${stats.people} people`], ['Links live', stats.live, FREE_MODE ? 'ready to send' : `${credits} left to use`], ['Opened', stats.opened, 'opened their card'], ['Replied', stats.replied, 'sent an RSVP']] as const).map(([label, value, note]) => (
             <div key={label} className="p-5 rounded-3xl border border-s-subtle bg-b-depth2 max-md:p-4">
               <div className="mb-2 text-sub-title-1 text-t-secondary">{label}</div>
               <div className="text-h3 max-md:text-h4">{value}</div>
@@ -187,7 +187,7 @@ export default function GuestManager({ card, initialGuests, replies, eventNames,
                   content={`Delete ${selected.length} guest${selected.length !== 1 ? 's' : ''}? Live links stop working and used links are not refunded.`} />
                 {selectedNotLive.length > 0 && (
                   <Button isBlack onClick={() => goLive(selectedNotLive.map((g) => g.id))} disabled={busy === 'live'} aria-busy={busy === 'live' || undefined}>
-                    Make {selectedNotLive.length} live · uses {selectedNotLive.length}
+                    {FREE_MODE ? `Make ${selectedNotLive.length} link${selectedNotLive.length === 1 ? '' : 's'} live` : `Make ${selectedNotLive.length} live · uses ${selectedNotLive.length}`}
                   </Button>
                 )}
               </div>
@@ -226,7 +226,7 @@ export default function GuestManager({ card, initialGuests, replies, eventNames,
                                   <QrButton link={linkOf(g)} fileName={`qr-${g.slug}`} />
                                 </>
                               ) : (
-                                <button type="button" className="action !text-t-primary" disabled={busy === 'live'} onClick={() => goLive([g.id])}><Icon name="check-circle" />Make live · 1 link</button>
+                                <button type="button" className="action !text-t-primary" disabled={busy === 'live'} onClick={() => goLive([g.id])}><Icon name="check-circle" />{FREE_MODE ? 'Make link live' : 'Make live · 1 link'}</button>
                               )}
                               <button type="button" className="action" onClick={() => startEdit(g)}><Icon name="edit" />Edit</button>
                             </div>
@@ -286,7 +286,7 @@ export default function GuestManager({ card, initialGuests, replies, eventNames,
               <div className="pb-3 text-caption text-t-secondary">“Coming” is the food headcount: the number of people guests said will attend each function.</div>
             </div>
           </Card>
-          {credits < Math.max(1, selectedNotLive.length) && (
+          {!FREE_MODE && credits < Math.max(1, selectedNotLive.length) && (
             <div className="card">
               <div className="p-3 text-body-2 text-t-secondary">Need more links? <Link className="text-t-primary font-bold hover:text-primary-01" href={buyHref}>5 links for {rupees(PRODUCTS.links5.price)}</Link></div>
             </div>

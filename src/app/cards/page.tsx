@@ -1,13 +1,15 @@
 import Link from 'next/link'
 import Icon from '@/components/Icon'
-import Shell from '@/components/dawat/Shell'
+import PublicShell from '@/components/dawat/PublicShell'
+import { getViewer } from '@/lib/viewer'
 import { SEO_PAGES } from '@/lib/seoPages'
 
 export const metadata = { title: 'Invitation card ideas — Mehndi, Nikah, Baraat, Walima | Dawatnama', description: 'Digital invitation cards for every function of a Pakistani wedding and more.' }
 
-export default function Cards() {
+export default async function Cards() {
   return (
-    <Shell title="Card ideas">
+    <PublicShell viewer={await getViewer()}>
+      <div className="max-w-300 mx-auto px-6 max-md:px-4">
       <div className="card">
         <div className="flex items-center h-12 pl-5 max-lg:pl-3">
           <h1 className="mr-auto text-h6">Invitation cards for every function</h1>
@@ -28,6 +30,7 @@ export default function Cards() {
           ))}
         </div>
       </div>
-    </Shell>
+      </div>
+    </PublicShell>
   )
 }

@@ -12,7 +12,6 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { url: `${base}/cards`, lastModified: now, priority: .8 },
     ...SEO_PAGES.map((p) => ({ url: `${base}/cards/${p.slug}`, lastModified: now, priority: .8 })),
     ...TEMPLATES.map((t) => ({ url: `${base}/preview/${t.id}`, lastModified: now, priority: .5 })),
-    { url: `${base}/premium`, lastModified: now, priority: .6 },
     ...['contact', 'terms', 'privacy', 'refund-policy'].map((p) => ({ url: `${base}/${p}`, lastModified: now, priority: .3 })),
   ]
 }

@@ -6,6 +6,23 @@ The dashboard uses the **Core 2.0 Dashboard Builder** design kit (Tailwind CSS v
 cards, tables, forms, pricing and settings layouts all come from the kit. The invitation cards guests open keep their
 own fairy-tale styles (`src/app/card.css`).
 
+## Everything is free (free mode)
+
+Making cards, every design tool, the drag-and-drop designer, animations, guest links and card links are free.
+1. In Supabase → SQL editor, run `supabase/free_mode.sql` once (safe to run again).
+2. Nothing to set in Vercel: `NEXT_PUBLIC_FREE_MODE` is `on` unless you set it to `off`.
+
+To charge again later: set `NEXT_PUBLIC_FREE_MODE=off` in Vercel, redeploy, and in Supabase run
+`update public.app_settings set value = 'false' where key = 'free_mode';`
+
+## The card designer
+
+Cards can be started from a blank card, from any ready-made template ("Design freely" turns it into a designer
+card), or from the designer templates. In the designer: text with 15 fonts, gold foil and shadows; photos with
+shapes and filters; uploaded videos or YouTube/Vimeo links; shapes, ornaments and fairy-tale scenes; an animation
+and an optional link on every element; long cards that scroll; and for the whole card an opening (palace gates,
+storybook, envelope…), floating effects (petals, sparkles, fireflies…) and background music.
+
 ## Project layout
 
 | Folder | What |
@@ -13,21 +30,19 @@ own fairy-tale styles (`src/app/card.css`).
 | `src/app` | Pages and API routes (Dawatnama pages plus the kit's demo pages) |
 | `src/components` | The kit's components (`Button`, `Card`, `Field`, `Table`, `Layout`, `Sidebar`, `Header`…) |
 | `src/components/dawat` | Dawatnama's own components (editor, guest list, card rendering, designer…) |
-| `src/templates`, `src/mocks` | The kit's page templates and sample data, used by the kit pages |
 | `src/contstants/navigation.tsx` | Sidebar and user-menu links |
 | `src/app/globals.css` | The kit's theme (colours, type, light/dark) plus spinner and designer styles |
 | `src/app/card.css` | Invitation card styles (unchanged look) |
 
-The kit's own demo pages are kept as they come in the kit, under "Kit pages" in the sidebar:
-`/demo` (kit dashboard), `/demo/settings`, `/products`, `/customers`, `/shop`, `/income/*`, `/promote`, `/messages`,
-`/notifications`, `/affiliate-center`, `/explore-creators`, `/upgrade-to-pro`. They show sample data only.
+The kit's demo pages (products, shop, income…) were removed to keep the site simple; only the kit components
+Dawatnama uses are kept.
 
 ## What is inside
 
 | Area | Where |
 | --- | --- |
-| Home, templates, designer cards, live previews | `/`, `/templates`, `/designs`, `/preview/[template]` |
-| Dashboard, all invitations, guests overview, profile settings | `/dashboard`, `/invitations`, `/guests`, `/settings` |
+| Landing page, templates (blank, quick edit, design freely), live previews | `/`, `/templates`, `/preview/[template]` |
+| My cards, guests and replies, profile settings | `/dashboard`, `/guests`, `/settings` |
 | Sign in / sign up with mobile number + password (SMS codes switched off) | `/login`, `src/app/api/login/*`, `src/lib/passwordAuth.ts` |
 | Card editor: details, functions, photos & video, design, share | `/dashboard/[id]` |
 | Fairy-tale scenes and opening effects | `src/components/Scene.tsx`, `InvitationView.tsx`, `globals.css` |

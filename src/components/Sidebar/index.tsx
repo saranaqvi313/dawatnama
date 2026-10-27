@@ -11,7 +11,6 @@ import Dropdown from "./Dropdown";
 import {
     navigation,
     navigationAdmin,
-    navigationKit,
     type NavItem,
 } from "@/contstants/navigation";
 
@@ -67,10 +66,6 @@ const Sidebar = ({
                 enabled={visibleSidebar}
             >
                 {items.map(renderItem)}
-                <div className="mt-5 mb-1 px-3 text-caption text-t-tertiary">
-                    Kit pages
-                </div>
-                {navigationKit.map(renderItem)}
             </RemoveScroll>
             <div className="mt-auto pt-6 max-md:pt-4">
                 {/* <Button className="mb-3" icon="chat-think" isWhite isCircle /> */}

@@ -1,7 +1,9 @@
 import type { SupabaseClient, User } from '@supabase/supabase-js'
+import { FREE_MODE } from './pricing'
 
 /** True when the user has paid for Premium. Reads the user's own profile row (RLS-protected). */
 export async function isPremium(supabase: SupabaseClient, userId: string | undefined | null): Promise<boolean> {
+  if (FREE_MODE) return true
   if (!userId) return false
   const { data } = await supabase.from('profiles').select('is_premium').eq('user_id', userId).maybeSingle()
   return Boolean(data?.is_premium)

@@ -3,7 +3,10 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { getTemplate, type Content, type Design } from '@/lib/types'
 import { isPremium } from '@/lib/premium'
-import { sanitizeCanvas } from '@/lib/canvas'
+import { FREE_MODE } from '@/lib/pricing'
+import { emptyCanvas, sanitizeCanvas } from '@/lib/canvas'
+import { classicToCanvas } from '@/lib/classicToCanvas'
+import { normalize } from '@/lib/types'
 import { getCanvasTemplate } from '@/lib/canvasTemplates'
 import { slugProblem, toSlug } from '@/lib/slug'
 
@@ -79,7 +82,7 @@ export async function saveInvitation(id: string, patch: { content: Content; desi
 }
 
 function saveResult(error: { message: string } | null, published: boolean): SaveResult {
-  if (error?.message.includes('premium_required')) return { ok: false, published, error: 'Customising the design needs Premium.' }
+  if (error?.message.includes('premium_required')) return { ok: false, published, error: FREE_MODE ? 'The database is still in paid mode. Run supabase/free_mode.sql in Supabase (SQL editor) once.' : 'Customising the design needs Premium.' }
   if (error?.message.includes('payment_required')) return { ok: false, published, error: 'Pay for this card to get its share link.' }
   return { ok: !error, published, error: error?.message }
 }
@@ -104,10 +107,10 @@ export async function deleteInvitations(ids: string[]): Promise<{ ok: boolean; e
 /** Starts a new drag-and-drop card from a design template (Premium). */
 export async function createCanvasInvitation(formData: FormData) {
   const tpl = getCanvasTemplate(String(formData.get('template') || ''))
-  if (!tpl) redirect('/designs')
+  if (!tpl) redirect('/templates')
   const supabase = await createClient()
   const { data: auth } = await supabase.auth.getUser()
-  if (!auth.user) redirect('/login?next=/designs')
+  if (!auth.user) redirect('/login?next=/templates')
   if (!(await isPremium(supabase, auth.user.id))) redirect('/premium?from=designer')
   const slug = `${tpl.id}-${Math.random().toString(36).slice(2, 8)}`
   const { data, error } = await supabase
@@ -148,4 +151,51 @@ export async function updateSlug(id: string, raw: string): Promise<{ ok: boolean
   if (error) return { ok: false, error: error.message }
   if (!data) return { ok: false, error: 'Card not found.' }
   return { ok: true, slug: data.slug }
+}
+
+/** A brand-new empty designer card ("start from scratch"). */
+export async function createBlankCard() {
+  const supabase = await createClient()
+  const { data: auth } = await supabase.auth.getUser()
+  if (!auth.user) redirect('/login?next=/templates')
+  const { data, error } = await supabase
+    .from('invitations')
+    .insert({ user_id: auth.user.id, slug: `card-${Math.random().toString(36).slice(2, 9)}`, template: 'blank', kind: 'canvas', canvas: emptyCanvas(), content: { eventType: 'Invitation', name1: 'My card' }, design: {} })
+    .select('id')
+    .single()
+  if (error || !data) redirect('/dashboard?error=create')
+  redirect(`/design/${data.id}`)
+}
+
+/** Opens any ready-made template in the drag-and-drop designer, so every part can be changed. */
+export async function createDesignFromTemplate(formData: FormData) {
+  const template = getTemplate(String(formData.get('template') || ''))
+  const supabase = await createClient()
+  const { data: auth } = await supabase.auth.getUser()
+  if (!auth.user) redirect('/login?next=/templates')
+  const title = [template.content.name1, template.content.name2].filter(Boolean).join(' & ') || template.name
+  const { data, error } = await supabase
+    .from('invitations')
+    .insert({ user_id: auth.user.id, slug: makeSlug(template.content), template: template.id, kind: 'canvas',
+      canvas: classicToCanvas(template.content, template.design), content: { ...template.content, name1: title }, design: {} })
+    .select('id')
+    .single()
+  if (error || !data) redirect('/dashboard?error=create')
+  redirect(`/design/${data.id}`)
+}
+
+/** Turns one of your quick-edit cards into a designer card (keeps the link, guests and replies). */
+export async function convertToDesigner(id: string): Promise<{ ok: boolean; error?: string }> {
+  const supabase = await createClient()
+  const { data: auth } = await supabase.auth.getUser()
+  if (!auth.user) return { ok: false, error: 'Please sign in again.' }
+  const { data: row } = await supabase.from('invitations').select('content, design, template, kind').eq('id', id).eq('user_id', auth.user.id).maybeSingle()
+  if (!row) return { ok: false, error: 'Card not found.' }
+  if (row.kind === 'canvas') return { ok: true }
+  const { content, design } = normalize(row.content, row.design, row.template)
+  const title = [content.name1, content.name2].filter(Boolean).join(' & ') || content.eventType || 'My card'
+  const { error } = await supabase.from('invitations').update({ kind: 'canvas', canvas: classicToCanvas(content, design), content: { ...content, name1: title } })
+    .eq('id', id).eq('user_id', auth.user.id)
+  if (error) return saveResult(error, false)
+  return { ok: true }
 }
