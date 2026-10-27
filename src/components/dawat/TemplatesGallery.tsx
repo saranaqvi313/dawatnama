@@ -3,9 +3,9 @@ import type { CSSProperties } from 'react'
 import Icon from '@/components/Icon'
 import { createBlankCard, createCanvasInvitation, createDesignFromTemplate, createInvitation } from '@/app/actions'
 import { CANVAS_TEMPLATES } from '@/lib/canvasTemplates'
-import { FONTS, TEMPLATES } from '@/lib/types'
+import { FONTS, GALLERY_TEMPLATES as TEMPLATES } from '@/lib/types'
 import CanvasCard from './canvas/CanvasCard'
-import Scene from './Scene'
+import TemplateFace, { faceStyle } from './TemplateFace'
 import SubmitButton from './SubmitButton'
 
 const small = '!h-10 !px-4 !text-caption max-md:!px-3'
@@ -43,10 +43,8 @@ export default function TemplatesGallery({ limit, compact }: { limit?: number; c
           <article key={t.id} className="flex flex-col">
             <Link href={`/preview/${t.id}`} aria-label={`Preview ${t.name}`}
               className="tpl-scene group flex flex-col items-center justify-center gap-2 aspect-[3/4] rounded-3xl text-center transition-transform duration-300 hover:-translate-y-1"
-              style={{ background: t.design.bg, color: t.design.ink, '--bg': t.design.bg, '--ink': t.design.ink, '--accent': t.design.accent } as CSSProperties}>
-              <span className="scene-mini"><Scene kind={t.design.scene} /></span>
-              <small className="text-overline uppercase tracking-[0.2em]" style={{ color: t.design.accent }}>{t.tag}</small>
-              <b className="!text-[2rem] max-md:!text-[1.6rem]" style={{ fontFamily: (FONTS[t.design.nameFont] ?? FONTS[t.design.headingFont]).css }}>{t.name}</b>
+              style={faceStyle(t)}>
+                <TemplateFace t={t} />
               <span className="absolute bottom-3 right-3 z-1 flex items-center gap-1 px-2.5 h-7 rounded-full bg-black/35 text-caption text-white backdrop-blur-sm opacity-0 transition-opacity group-hover:opacity-100 max-md:opacity-100">
                 <Icon className="!size-4 fill-white" name="video" />Preview
               </span>

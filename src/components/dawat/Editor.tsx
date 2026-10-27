@@ -8,6 +8,7 @@ import Select from '@/components/Select'
 import Tabs from '@/components/Tabs'
 import InvitationView from './InvitationView'
 import Scene from './Scene'
+import { ProgramIcon, WaxSeal } from './story/Art'
 import LinkNameField from './LinkNameField'
 import QrButton from './QrButton'
 import { Chips, ColorField, Label, Notice, Panel, SwitchRow, UploadBox } from './ui'
@@ -18,7 +19,7 @@ import { PAY_MESSAGES } from './SharePaywall'
 import { FREE_MODE, PRODUCTS, rupees } from '@/lib/pricing'
 import { uploadMedia } from '@/lib/upload'
 import { videoEmbed } from '@/lib/media'
-import { EVENT_TYPES, FONTS, OPTIONS, PALETTES, SCRIPT_FONTS, TEXT_FONTS, type Content, type Design, type EventItem, type Invitation } from '@/lib/types'
+import { EVENT_TYPES, FONTS, OPTIONS, PALETTES, PROGRAM_ICONS, SCRIPT_FONTS, STORY_THEMES, TEXT_FONTS, type Content, type Design, type EventItem, type Invitation } from '@/lib/types'
 
 const TABS = [
   { id: 1, name: 'Details' },
@@ -122,6 +123,13 @@ export default function Editor({ invitation, siteUrl, premium, sharePaid: paid0,
       onChange={(o) => d(k, TEXT_FONTS[o.id - 1])} placeholder="Choose a font" />
   )
   const names = [content.name1, content.name2].filter(Boolean).join(' & ') || 'Ayesha & Hamza'
+  const isStory = design.layout === 'story'
+  const pickTheme = (k: string) => { const th = STORY_THEMES[k]; setDesign((x) => ({ ...x, theme: k, bg: th.paper, ink: th.ink, accent: th.accent })) }
+  const setLayout = (v: string) => setDesign((x) => {
+    if (v === 'story') { const k = x.theme in STORY_THEMES ? x.theme : 'burgundy'; const th = STORY_THEMES[k]; return { ...x, layout: v, theme: k, bg: th.paper, ink: th.ink, accent: th.accent, opening: 'seal' } }
+    return { ...x, layout: v, opening: x.opening === 'seal' ? 'envelope' : x.opening }
+  })
+  const setProg = (i: number, k: 'time' | 'title' | 'icon', v: string) => c('program', content.program.map((p, j) => (j === i ? { ...p, [k]: v } : p)))
   const swatch = { '--bg': design.bg, '--ink': design.ink, '--accent': design.accent } as CSSProperties
   const playOpening = () => { setShowOpening(true); setReplay((n) => n + 1) }
   const tone = status.startsWith('Could not') || status.includes('needs') ? 'red' : status.startsWith('Saved') || status.includes('live') ? 'green' : 'gray'
@@ -168,8 +176,60 @@ export default function Editor({ invitation, siteUrl, premium, sharePaid: paid0,
                   <SwitchRow title="Countdown" note="Days, hours and minutes to the first function" checked={content.showCountdown} onChange={(v) => c('showCountdown', v)} />
                   <SwitchRow title="Family list" checked={content.showFamily} onChange={(v) => c('showFamily', v)} />
                   <SwitchRow title="RSVP form" note="Guests reply on the card" checked={content.showRsvp} onChange={(v) => c('showRsvp', v)} />
+                  {isStory && <>
+                    <SwitchRow title="Calendar" note="A month calendar with a heart on the date" checked={content.showCalendar} onChange={(v) => c('showCalendar', v)} />
+                    <SwitchRow title="Programme" note="Timeline of the day" checked={content.showProgram} onChange={(v) => c('showProgram', v)} />
+                    <SwitchRow title="Dress code" checked={content.showDress} onChange={(v) => c('showDress', v)} />
+                  </>}
                 </div>
               </Card>
+              {isStory && (
+                <Card title="Programme of the day">
+                  <div className={FORM}>
+                    <p className="text-body-2 text-t-secondary">Leave empty to use your functions&rsquo; times.</p>
+                    {content.program.map((p, i) => (
+                      <div key={i} className="flex flex-col gap-3 p-3 rounded-3xl border border-s-subtle">
+                        <div className="flex gap-3 items-end max-md:flex-wrap">
+                          <Field className="w-32 max-md:w-[calc(50%-0.375rem)]" label="Time" type="time" value={p.time} onChange={(e) => setProg(i, 'time', e.target.value)} />
+                          <Field className="flex-1 min-w-40" label="What happens" value={p.title} onChange={(e) => setProg(i, 'title', e.target.value)} dir="auto" />
+                          <Button isCircle isWhite icon="trash" className="!size-10 shrink-0" onClick={() => c('program', content.program.filter((_, j) => j !== i))} aria-label="Remove" />
+                        </div>
+                        <div className="flex flex-wrap gap-1.5" role="group" aria-label="Icon">
+                          {PROGRAM_ICONS.map((ic) => (
+                            <button type="button" key={ic} title={ic} aria-label={ic} aria-pressed={p.icon === ic} onClick={() => setProg(i, 'icon', ic)}
+                              className={`flex items-center justify-center size-10 rounded-full border transition-all [&_svg]:size-5 ${p.icon === ic ? 'border-s-stroke2 shadow-depth text-t-primary' : 'border-s-subtle text-t-tertiary hover:text-t-primary'}`}>
+                              <ProgramIcon name={ic} />
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                    <Button isStroke icon="plus" className="gap-2 self-start" onClick={() => c('program', [...content.program, { time: '', title: '', icon: 'heart' }])}>Add to programme</Button>
+                  </div>
+                </Card>
+              )}
+              {isStory && (
+                <Card title="Dress code and closing">
+                  <div className={FORM}>
+                    <Field label="Dress code note" textarea classInput="!h-24" value={content.dressCode} onChange={(e) => c('dressCode', e.target.value)} dir="auto" placeholder="e.g. Pastels and gold, please" />
+                    <div>
+                      <Label>Dress colours</Label>
+                      <div className="flex flex-wrap items-center gap-3">
+                        {content.dressColors.map((col, i) => (
+                          <span key={i} className="relative">
+                            <input type="color" value={col} aria-label={`Colour ${i + 1}`} onChange={(e) => c('dressColors', content.dressColors.map((x, j) => (j === i ? e.target.value : x)))}
+                              className="block size-12 rounded-full border-2 border-s-stroke2 cursor-pointer overflow-hidden [&::-webkit-color-swatch-wrapper]:p-0 [&::-webkit-color-swatch]:border-0 [&::-webkit-color-swatch]:rounded-full" />
+                            <button type="button" aria-label="Remove colour" onClick={() => c('dressColors', content.dressColors.filter((_, j) => j !== i))}
+                              className="absolute -top-1 -right-1 flex items-center justify-center size-5 rounded-full bg-b-surface2 shadow-depth text-[11px]">×</button>
+                          </span>
+                        ))}
+                        {content.dressColors.length < 6 && <Button isCircle isStroke icon="plus" className="!size-12" aria-label="Add colour" onClick={() => c('dressColors', [...content.dressColors, design.accent])} />}
+                      </div>
+                    </div>
+                    <Field label="Closing line" value={content.closing} onChange={(e) => c('closing', e.target.value)} dir="auto" placeholder="We are waiting for you!" />
+                  </div>
+                </Card>
+              )}
             </>
           )}
 
@@ -270,6 +330,33 @@ export default function Editor({ invitation, siteUrl, premium, sharePaid: paid0,
 
           {tab.id === 4 && premium && (
             <>
+              <Card title="Card type">
+                <div className={FORM}>
+                  <div>
+                    <Label>Layout</Label>
+                    <Chips value={design.layout} options={OPTIONS.layout} onChange={setLayout} />
+                  </div>
+                  {isStory && <p className="-mt-4 text-body-2 text-t-secondary">A long, scrolling card: wax-seal envelope, calendar, countdown, programme, map buttons, dress code, photos and RSVP.</p>}
+                </div>
+              </Card>
+              {isStory && (
+                <Card title="Colour story">
+                  <div className="grid grid-cols-5 gap-3 px-5 pb-5 max-2xl:grid-cols-3 max-md:grid-cols-2 max-lg:px-3">
+                    {Object.entries(STORY_THEMES).map(([k, th]) => (
+                      <button type="button" key={k} onClick={() => pickTheme(k)} aria-pressed={design.theme === k}
+                        className={`flex flex-col gap-2 p-1.5 rounded-3xl border text-button transition-all ${design.theme === k ? 'border-s-stroke2 shadow-depth text-t-primary' : 'border-s-subtle text-t-secondary hover:text-t-primary'}`}>
+                        <span className={`st-${k} flex items-center justify-center gap-2 h-24 rounded-[1.1rem]`} style={{ background: th.bg }}>
+                          <WaxSeal initials="♥" size={44} />
+                          <i className="size-5 rounded-full" style={{ background: th.paper }} />
+                          <i className="size-5 rounded-full" style={{ background: th.gold }} />
+                        </span>
+                        <span className="pb-1.5">{th.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </Card>
+              )}
+              {!isStory && <>
               <Card title="Scene">
                 <div className="grid grid-cols-4 gap-3 px-5 pb-5 max-2xl:grid-cols-3 max-md:grid-cols-2 max-lg:px-3" style={swatch}>
                   {OPTIONS.scene.map(([v, l]) => (
@@ -303,6 +390,7 @@ export default function Editor({ invitation, siteUrl, premium, sharePaid: paid0,
                   </div>
                 </div>
               </Card>
+              </>}
               <Card title="Names lettering">
                 <div className={FORM} style={swatch}>
                   <div className="grid grid-cols-3 gap-3 max-h-80 overflow-y-auto p-1 -m-1 max-2xl:grid-cols-2 max-md:grid-cols-1">
@@ -324,12 +412,18 @@ export default function Editor({ invitation, siteUrl, premium, sharePaid: paid0,
               </Card>
               <Card title="Opening and effects" headContent={<Button className="mr-1 !h-10 !px-4 gap-1.5" isStroke icon="video" onClick={playOpening}>Watch the opening</Button>}>
                 <div className={FORM}>
-                  {choice('Opening', 'opening', playOpening)}
+                  {isStory ? (
+                    <div>
+                      <Label>Opening</Label>
+                      <Chips value={design.opening === 'none' ? 'none' : 'seal'} options={[['seal', 'Wax-seal envelope'], ['none', 'None']]} onChange={(v) => { d('opening', v); playOpening() }} />
+                    </div>
+                  ) : choice('Opening', 'opening', playOpening)}
                   {choice('Floating effect', 'effect')}
-                  {choice('Card style', 'cardStyle')}
-                  {choice('Photo shape', 'photoShape')}
-                  {choice('Background pattern', 'background')}
-                  {choice('Layout', 'layout')}
+                  {!isStory && <>
+                    {choice('Card style', 'cardStyle')}
+                    {choice('Photo shape', 'photoShape')}
+                    {choice('Background pattern', 'background')}
+                  </>}
                 </div>
               </Card>
             </>
