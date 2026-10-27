@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent } from 'react'
 import Effects from './Effects'
+import StoryView from './story/StoryView'
 import Scene from './Scene'
 import { cardText } from '@/lib/i18n'
 import { FONTS, type Content, type Design, type EventItem } from '@/lib/types'
@@ -32,7 +33,7 @@ const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
 
 /** "Saturday 19 December 2026 · 6:00 pm". Formatted by hand so the server and the phone print exactly the same text. */
-function fmtDate(e: EventItem, _lang: string) {
+export function fmtDate(e: EventItem, _lang: string) {
   if (!e.date) return ''
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(e.date)
   if (!m) return e.date
@@ -45,7 +46,7 @@ function fmtDate(e: EventItem, _lang: string) {
   return `${date} · ${h % 12 || 12}:${t[2]} ${h < 12 ? 'am' : 'pm'}`
 }
 
-function icsHref(e: EventItem, title: string) {
+export function icsHref(e: EventItem, title: string) {
   const start = `${e.date.replace(/-/g, '')}T${(e.time || '00:00').replace(':', '')}00`
   const esc = (s: string) => s.replace(/([,;\\])/g, '\\$1').replace(/\n/g, ' ')
   const ics = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Dawatnama//EN', 'BEGIN:VEVENT', `UID:${start}-${Math.random().toString(36).slice(2)}@dawatnama`,
@@ -175,7 +176,12 @@ type ViewProps = {
   preview?: boolean
 }
 
-export default function InvitationView({ content, design, invitationId, skipOpening, guest, trackSlug, preview }: ViewProps) {
+export default function InvitationView(props: ViewProps) {
+  if (props.design.layout === 'story') return <StoryView {...props} />
+  return <ClassicView {...props} />
+}
+
+function ClassicView({ content, design, invitationId, skipOpening, guest, trackSlug, preview }: ViewProps) {
   const t = cardText.en
   const hasOpening = !skipOpening && design.opening !== 'none'
   const [stage, setStage] = useState<'closed' | 'opening' | 'open'>(hasOpening ? 'closed' : 'open')
