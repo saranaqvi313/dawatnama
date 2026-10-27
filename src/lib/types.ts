@@ -1,9 +1,6 @@
 export type Lang = 'en'
 
 export type EventItem = { name: string; date: string; time: string; venue: string; address: string }
-/** One line of the day's programme ("17:00 · Nikah ceremony"), with a small drawing. */
-export type ProgramItem = { time: string; title: string; icon: string }
-export const PROGRAM_ICONS = ['rings', 'mosque', 'glass', 'dinner', 'camera', 'music', 'car', 'cake', 'heart', 'flower'] as const
 
 export type Content = {
   lang: Lang
@@ -23,14 +20,6 @@ export type Content = {
   showCountdown: boolean
   showFamily: boolean
   showRsvp: boolean
-  /** Story cards (long, website-style invitations) */
-  program: ProgramItem[]
-  dressCode: string
-  dressColors: string[]
-  closing: string
-  showCalendar: boolean
-  showProgram: boolean
-  showDress: boolean
 }
 
 export type Design = {
@@ -48,17 +37,6 @@ export type Design = {
   effect: string
   layout: string
   cardStyle: string
-  /** Colour story for story cards: burgundy, emerald, olive, noir, pearl */
-  theme: string
-}
-
-/** Colour stories for the long, website-style cards. */
-export const STORY_THEMES: Record<string, { label: string; bg: string; paper: string; ink: string; accent: string; gold: string; soft: string; deco: 'roses' | 'peony' | 'olive' | 'lace' | 'pearls' }> = {
-  burgundy: { label: 'Burgundy romance', bg: '#5a1322', paper: '#f7f0e7', ink: '#3b0d17', accent: '#7a1a2c', gold: '#c9a46a', soft: '#e9d9cc', deco: 'roses' },
-  emerald: { label: 'Emerald garden', bg: '#10291f', paper: '#f4f1e9', ink: '#15291f', accent: '#1f4a3a', gold: '#d6be86', soft: '#dfe5dc', deco: 'peony' },
-  olive: { label: 'Olive grove', bg: '#6a7247', paper: '#f2eee3', ink: '#3c3f26', accent: '#5b6838', gold: '#b69c60', soft: '#e3e3d1', deco: 'olive' },
-  noir: { label: 'Black & white lace', bg: '#161616', paper: '#f5f2ed', ink: '#1b1b1b', accent: '#1b1b1b', gold: '#9d9d9d', soft: '#e6e2dc', deco: 'lace' },
-  pearl: { label: 'Pearl & taupe', bg: '#a29482', paper: '#f6f1e9', ink: '#4a4036', accent: '#7f705e', gold: '#c7b494', soft: '#e8dfd2', deco: 'pearls' },
 }
 
 export type Invitation = {
@@ -146,84 +124,17 @@ const baseContent: Content = {
   events: [{ name: 'Nikah', date: '2026-12-20', time: '19:00', venue: 'Serena Hotel', address: 'Khayaban-e-Suhrawardy, Islamabad' }],
   family: [],
   photoUrl: '', gallery: [], videoUrl: '', musicUrl: '', showBismillah: true, showCountdown: true, showFamily: true, showRsvp: true,
-  program: [], dressCode: '', dressColors: [], closing: '', showCalendar: true, showProgram: true, showDress: true,
 }
 
-export type Template = { id: string; name: string; tag: string; design: Design; content: Content; /** kept for older cards, not shown in the gallery */ hidden?: boolean }
+export type Template = { id: string; name: string; tag: string; design: Design; content: Content }
 
 const design = (d: Partial<Design> & Pick<Design, 'bg' | 'ink' | 'accent'>): Design => ({
   headingFont: 'cormorant', bodyFont: 'poppins', nameFont: 'pinyon', scene: 'none', foil: true, photoShape: 'circle',
-  opening: 'fade', background: 'plain', effect: 'none', layout: 'classic', cardStyle: 'framed', theme: 'burgundy', ...d,
+  opening: 'fade', background: 'plain', effect: 'none', layout: 'classic', cardStyle: 'framed', ...d,
 })
 const ev = (name: string, date: string, time: string, venue: string, address: string): EventItem => ({ name, date, time, venue, address })
 
-const story = (theme: string, d: Partial<Design> = {}): Design => {
-  const t = STORY_THEMES[theme]
-  return design({ bg: t.paper, ink: t.ink, accent: t.accent, headingFont: 'cormorant', bodyFont: 'cormorant', nameFont: 'pinyon', layout: 'story', theme, opening: 'seal', effect: 'none', foil: false, ...d })
-}
-const prog = (...items: [string, string, string][]): ProgramItem[] => items.map(([time, title, icon]) => ({ time, title, icon }))
-
 export const TEMPLATES: Template[] = [
-  {
-    id: 'burgundy-romance', name: 'Burgundy Romance', tag: 'Nikah · Baraat', hidden: true,
-    design: story('burgundy', { nameFont: 'pinyon', effect: 'petals' }),
-    content: { ...baseContent, eventType: 'Shaadi', name1: 'Ayesha', name2: 'Hamza', heading: 'Together with their families',
-      message: 'With the blessings of Allah and the love of our families, we would be honoured to have you with us as we begin our life together.',
-      events: [ev('Nikah', '2026-12-19', '17:00', 'Faisal Mosque', 'Shah Faisal Avenue, Islamabad'), ev('Baraat', '2026-12-20', '19:30', 'Serena Hotel', 'Khayaban-e-Suhrawardy, Islamabad')],
-      program: prog(['17:00', 'Nikah ceremony', 'mosque'], ['19:30', 'Baraat arrives', 'car'], ['20:30', 'Dinner', 'dinner'], ['22:00', 'Rukhsati', 'heart']),
-      dressCode: 'We would love to see you in deep reds, ivory and gold.', dressColors: ['#5a1322', '#8c2a3c', '#e9d9cc', '#c9a46a'],
-      closing: 'We are waiting for you!' },
-  },
-  {
-    id: 'emerald-garden', name: 'Emerald Garden', tag: 'Nikah · Walima', hidden: true,
-    design: story('emerald', { nameFont: 'parisienne', effect: 'fireflies' }),
-    content: { ...baseContent, eventType: 'Walima', name1: 'Maryam', name2: 'Usman', heading: 'You are invited to the wedding of',
-      message: 'A garden of white flowers, the people we love, and the start of our forever. Please join us.',
-      events: [ev('Nikah', '2026-12-19', '16:00', 'Lawn of the Family Home', 'F-7/2, Islamabad'), ev('Walima', '2026-12-21', '20:00', 'Marriott Hotel', 'Aga Khan Road, Islamabad')],
-      program: prog(['16:00', 'Nikah', 'rings'], ['18:00', 'Hi-tea in the garden', 'glass'], ['20:00', 'Walima dinner', 'dinner'], ['21:30', 'Photos with the couple', 'camera']),
-      dressCode: 'Garden colours: emerald, sage and white.', dressColors: ['#10291f', '#2f5e47', '#a9bba4', '#f4f1e9'],
-      closing: 'See you in the garden' },
-  },
-  {
-    id: 'olive-grove', name: 'Olive Grove', tag: 'Mehndi · Nikah', hidden: true,
-    design: story('olive', { nameFont: 'alexbrush', effect: 'petals' }),
-    content: { ...baseContent, eventType: 'Mehndi', name1: 'Zara', name2: 'Ali', heading: 'Join us for the celebrations of', showBismillah: false,
-      message: 'Dholki nights, mehndi songs and a lot of love. Come celebrate with our families.',
-      events: [ev('Mehndi', '2026-12-17', '20:00', 'Family Residence', 'DHA Phase 2, Islamabad'), ev('Nikah', '2026-12-19', '18:00', 'Faisal Mosque', 'Shah Faisal Avenue, Islamabad')],
-      program: prog(['20:00', 'Guests arrive', 'flower'], ['20:30', 'Mehndi rasm', 'heart'], ['21:30', 'Dholki and songs', 'music'], ['22:30', 'Dinner', 'dinner']),
-      dressCode: 'Mehndi: olive, mustard and cream.', dressColors: ['#5b6838', '#9aa36b', '#d8b45a', '#f2eee3'],
-      closing: 'Come dance with us!' },
-  },
-  {
-    id: 'noir-lace', name: 'Noir Lace', tag: 'Engagement · Nikah', hidden: true,
-    design: story('noir', { nameFont: 'monsieur', headingFont: 'playfair', effect: 'none' }),
-    content: { ...baseContent, eventType: 'Engagement', name1: 'Hina', name2: 'Bilal', heading: 'Save the date', showBismillah: false,
-      message: 'Two families, one promise. We would love you to be there when we say yes.',
-      events: [ev('Mangni', '2026-11-28', '19:00', 'The Monal', 'Pir Sohawa Road, Islamabad')],
-      program: prog(['19:00', 'Welcome', 'glass'], ['19:45', 'Exchange of rings', 'rings'], ['20:30', 'Dinner', 'dinner'], ['21:30', 'Cake', 'cake']),
-      dressCode: 'Black, white and silver.', dressColors: ['#161616', '#5c5c5c', '#d9d9d9', '#f5f2ed'],
-      closing: 'With love' },
-  },
-  {
-    id: 'pearl-taupe', name: 'Pearl & Taupe', tag: 'Walima · Reception', hidden: true,
-    design: story('pearl', { nameFont: 'italianno', headingFont: 'playfair', effect: 'sparkles' }),
-    content: { ...baseContent, eventType: 'Walima', name1: 'Sana', name2: 'Omar', heading: 'Dear family and friends',
-      message: 'Our hearts are full. Please join us for an evening of dinner, laughter and blessings as we celebrate our Walima.',
-      events: [ev('Walima', '2026-12-22', '20:00', 'Serena Hotel', 'Khayaban-e-Suhrawardy, Islamabad')],
-      program: prog(['20:00', 'Welcome drinks', 'glass'], ['20:45', 'Couple entrance', 'heart'], ['21:15', 'Dinner', 'dinner'], ['22:30', 'Photos', 'camera']),
-      dressCode: 'Soft neutrals: pearl, champagne and taupe.', dressColors: ['#7f705e', '#b9ad9e', '#e8dfd2', '#f6f1e9'],
-      closing: 'Thank you for being part of our story' },
-  },
-  {
-    id: 'rose-mehndi', name: 'Rose Mehndi', tag: 'Mehndi · Dholki', hidden: true,
-    design: story('burgundy', { nameFont: 'greatvibes', headingFont: 'cinzel', effect: 'petals' }),
-    content: { ...baseContent, eventType: 'Mehndi', name1: 'Fatima', name2: 'Ahmed', heading: 'Rang, khushboo aur dholki', showBismillah: false,
-      message: 'An evening of roses, mehndi and music. Your presence will make it complete.',
-      events: [ev('Dholki', '2026-12-14', '20:00', 'Family Residence', 'G-10/4, Islamabad'), ev('Mehndi', '2026-12-17', '20:00', 'Marquee at Club Road', 'Club Road, Islamabad')],
-      program: prog(['20:00', 'Dholki', 'music'], ['21:00', 'Mehndi rasm', 'flower'], ['22:00', 'Dinner', 'dinner']),
-      dressCode: 'Reds, pinks and gold.', dressColors: ['#7a1a2c', '#c0405a', '#f0b9c0', '#c9a46a'],
-      closing: 'Come dance with us!' },
-  },
   {
     id: 'sheesh-mahal', name: 'Sheesh Mahal', tag: 'Nikah · Baraat',
     design: design({ bg: '#2a0f2e', ink: '#fbeee6', accent: '#e8b86a', headingFont: 'cinzel', bodyFont: 'cormorant', nameFont: 'pinyon', scene: 'sheesh', opening: 'gates', background: 'jaali', effect: 'sparkles', cardStyle: 'glass', photoShape: 'arch' }),
@@ -288,11 +199,8 @@ export const TEMPLATES: Template[] = [
 ]
 
 export function getTemplate(id: string): Template {
-  return TEMPLATES.find((t) => t.id === id) ?? TEMPLATES.find((t) => !t.hidden) ?? TEMPLATES[0]
+  return TEMPLATES.find((t) => t.id === id) ?? TEMPLATES[0]
 }
-
-/** Templates shown in the gallery (older ones stay available for cards made with them). */
-export const GALLERY_TEMPLATES = TEMPLATES.filter((t) => !t.hidden)
 
 /** Fill in anything missing so older or partial rows always render. */
 export function normalize(content: Partial<Content> | null, design: Partial<Design> | null, templateId: string) {
@@ -302,10 +210,5 @@ export function normalize(content: Partial<Content> | null, design: Partial<Desi
   if (!Array.isArray(c.family)) c.family = []
   c.gallery = Array.isArray(c.gallery) ? c.gallery.filter((u) => typeof u === 'string' && u.startsWith('https://')).slice(0, 8) : []
   if (typeof c.videoUrl !== 'string') c.videoUrl = ''
-  if (!Array.isArray(c.program)) c.program = []
-  if (!Array.isArray(c.dressColors)) c.dressColors = []
-  c.dressColors = c.dressColors.filter((x) => typeof x === 'string' && /^#[0-9a-f]{3,8}$/i.test(x)).slice(0, 8)
-  for (const k of ['dressCode', 'closing'] as const) if (typeof c[k] !== 'string') c[k] = ''
-  for (const k of ['showCalendar', 'showProgram', 'showDress'] as const) if (typeof c[k] !== 'boolean') c[k] = true
   return { content: c, design: { ...t.design, ...(design ?? {}) } as Design }
 }
