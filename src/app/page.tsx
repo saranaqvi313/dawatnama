@@ -5,8 +5,8 @@ import Icon from '@/components/Icon'
 import PublicShell from '@/components/dawat/PublicShell'
 import InvitationView from '@/components/dawat/InvitationView'
 import FaqList from '@/components/dawat/FaqList'
-import TemplateFace, { faceStyle } from '@/components/dawat/TemplateFace'
-import { FONTS, GALLERY_TEMPLATES as TEMPLATES } from '@/lib/types'
+import Scene from '@/components/dawat/Scene'
+import { FONTS, TEMPLATES } from '@/lib/types'
 import { getViewer } from '@/lib/viewer'
 
 const STEPS = [
@@ -79,8 +79,10 @@ export default async function Home() {
           <div className="flex gap-4 overflow-x-auto pb-2 -mx-6 px-6 snap-x scroll-pl-6 scrollbar-none max-md:-mx-4 max-md:px-4 max-md:scroll-pl-4">
             {strip.map((t) => (
               <Link key={t.id} href={`/preview/${t.id}`} className="tpl-scene shrink-0 snap-start flex flex-col items-center justify-center gap-2 w-52 aspect-[3/4] rounded-3xl text-center transition-transform duration-300 hover:-translate-y-1 max-md:w-40"
-                style={faceStyle(t)}>
-                <TemplateFace t={t} size="md" />
+                style={{ background: t.design.bg, color: t.design.ink, '--bg': t.design.bg, '--ink': t.design.ink, '--accent': t.design.accent } as CSSProperties}>
+                <span className="scene-mini"><Scene kind={t.design.scene} /></span>
+                <small className="text-overline uppercase tracking-[0.2em]" style={{ color: t.design.accent }}>{t.tag}</small>
+                <b className="!text-[1.8rem] max-md:!text-[1.4rem]" style={{ fontFamily: (FONTS[t.design.nameFont] ?? FONTS[t.design.headingFont]).css }}>{t.name}</b>
               </Link>
             ))}
             <Link href="/templates" className="shrink-0 snap-start flex flex-col items-center justify-center gap-3 w-52 aspect-[3/4] rounded-3xl border-2 border-dashed border-s-stroke2 text-t-secondary transition-colors hover:text-t-primary hover:border-s-highlight max-md:w-40">

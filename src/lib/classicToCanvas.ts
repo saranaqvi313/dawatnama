@@ -68,18 +68,6 @@ export function classicToCanvas(content: Content, design: Design): CanvasDoc {
       text(place, 44, { font: bfont, size: 12, lineHeight: 1.45, link: map })
     }
   }
-  const program = content.showProgram ? (content.program ?? []).filter((p) => p.title) : []
-  if (program.length) {
-    y += 8
-    text('Programme', 30, { font: hfont, size: 20, color: accent })
-    text(program.map((p) => `${p.time}  ·  ${p.title}`).join('\n'), Math.min(220, 22 * program.length), { font: bfont, size: 13, lineHeight: 1.6 })
-  }
-  if (content.showDress && content.dressCode) {
-    y += 8
-    text('Dress code', 30, { font: hfont, size: 20, color: accent })
-    text(content.dressCode, 40, { font: bfont, size: 13, lineHeight: 1.45 })
-  }
-  if (content.closing && design.layout === 'story') text(content.closing, 50, { font: nfont, size: 32, color: accent })
   if (content.showFamily && content.family?.filter(Boolean).length) {
     y += 8
     text('Awaiting your arrival', 30, { font: hfont, size: 20, color: accent })
@@ -106,7 +94,7 @@ export function classicToCanvas(content: Content, design: Design): CanvasDoc {
   return sanitizeCanvas({
     v: 1, h,
     bg: { color: design.bg, color2: design.bg, gradient: false, pattern, patternColor: accent, image: '', imageOpacity: 1 },
-    fx: { opening: (design.opening === 'seal' ? 'envelope' : design.opening) as OpeningName, effect: design.effect as EffectName, effectColor: accent, music: content.musicUrl || '', sealText: given.join(' & ') },
+    fx: { opening: design.opening as OpeningName, effect: design.effect as EffectName, effectColor: accent, music: content.musicUrl || '', sealText: given.join(' & ') },
     elements: els,
   })
 }
