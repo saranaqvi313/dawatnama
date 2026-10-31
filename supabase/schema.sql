@@ -817,3 +817,103 @@ drop policy if exists "own ai rows" on public.ai_generations;
 create policy "own ai rows" on public.ai_generations for select to authenticated using (user_id = auth.uid());
 drop policy if exists "add own ai rows" on public.ai_generations;
 create policy "add own ai rows" on public.ai_generations for insert to authenticated with check (user_id = auth.uid());
+
+
+-- ======================================================================================
+-- AI credits (added 2026-11). AI card designs and AI pictures are paid, even in free mode:
+-- each one is a paid request to Claude, GPT or Gemini. Safe to run again.
+-- ======================================================================================
+
+alter table public.profiles add column if not exists ai_credits int not null default 0;
+do $$ begin
+  alter table public.profiles add constraint profiles_ai_credits_nonneg check (ai_credits >= 0);
+exception when duplicate_object then null; end $$;
+
+alter table public.payments drop constraint if exists payments_purpose_check;
+alter table public.payments add constraint payments_purpose_check check (purpose in ('premium', 'share', 'credits', 'package', 'ai'));
+
+-- What each AI request was and what it cost. Rows are written only by the functions below.
+alter table public.ai_generations add column if not exists kind text not null default 'design';
+alter table public.ai_generations add column if not exists provider text;
+alter table public.ai_generations add column if not exists credits int not null default 0;
+alter table public.ai_generations add column if not exists refunded boolean not null default false;
+do $$ begin
+  alter table public.ai_generations add constraint ai_generations_kind_check check (kind in ('design', 'image'));
+exception when duplicate_object then null; end $$;
+drop policy if exists "add own ai rows" on public.ai_generations;
+
+-- Completes a verified payment once: Premium, a card's link, link credits, the wedding package, or AI credits.
+create or replace function public.complete_payment(p_order_ref text, p_gateway_ref text, p_gateway_status text)
+returns boolean language plpgsql security definer set search_path = '' as $$
+declare v_user uuid; v_purpose text; v_card uuid; v_credits int;
+begin
+  update public.payments
+     set status = 'paid', paid_at = now(), gateway_ref = p_gateway_ref, gateway_status = p_gateway_status
+   where order_ref = p_order_ref and status = 'pending'
+  returning user_id, purpose, invitation_id, credits into v_user, v_purpose, v_card, v_credits;
+  if v_user is null then
+    return exists (select 1 from public.payments where order_ref = p_order_ref and status = 'paid');
+  end if;
+  perform set_config('dawatnama.trusted', 'on', true);
+  if v_purpose = 'share' then
+    update public.invitations
+       set share_paid = true, share_paid_at = coalesce(share_paid_at, now()), published = true
+     where id = v_card and user_id = v_user;
+  elsif v_purpose = 'ai' then
+    insert into public.profiles (user_id, ai_credits) values (v_user, greatest(v_credits, 0))
+    on conflict (user_id) do update set ai_credits = public.profiles.ai_credits + greatest(v_credits, 0), updated_at = now();
+  elsif v_purpose in ('credits', 'package') then
+    insert into public.profiles (user_id, is_premium, premium_since, link_credits)
+         values (v_user, v_purpose = 'package', case when v_purpose = 'package' then now() end, greatest(v_credits, 0))
+    on conflict (user_id) do update set
+         link_credits = public.profiles.link_credits + greatest(v_credits, 0),
+         is_premium = public.profiles.is_premium or v_purpose = 'package',
+         premium_since = case when v_purpose = 'package' then coalesce(public.profiles.premium_since, now()) else public.profiles.premium_since end,
+         updated_at = now();
+  else
+    insert into public.profiles (user_id, is_premium, premium_since)
+         values (v_user, true, now())
+    on conflict (user_id) do update set is_premium = true,
+           premium_since = coalesce(public.profiles.premium_since, now()), updated_at = now();
+  end if;
+  perform set_config('dawatnama.trusted', 'off', true);
+  return true;
+end $$;
+revoke all on function public.complete_payment(text, text, text) from public, anon, authenticated;
+grant execute on function public.complete_payment(text, text, text) to service_role;
+
+-- Takes the credits for one AI request (all or nothing) and logs it. Returns the log row id.
+-- Free mode does not apply: AI always needs credits.
+create or replace function public.use_ai_credits(p_credits int, p_kind text, p_provider text) returns bigint
+language plpgsql security definer set search_path = '' as $$
+declare v_uid uuid := auth.uid(); v_have int; v_id bigint;
+begin
+  if v_uid is null then raise exception 'not_signed_in'; end if;
+  if p_credits < 1 or p_credits > 10 or p_kind not in ('design', 'image') or p_provider not in ('claude', 'gpt', 'gemini') then
+    raise exception 'bad_input';
+  end if;
+  select ai_credits into v_have from public.profiles where user_id = v_uid for update;
+  if coalesce(v_have, 0) < p_credits then
+    raise exception 'not_enough_ai_credits' using errcode = 'P0001', hint = format('Needs %s AI credits, you have %s.', p_credits, coalesce(v_have, 0));
+  end if;
+  update public.profiles set ai_credits = ai_credits - p_credits, updated_at = now() where user_id = v_uid;
+  insert into public.ai_generations (user_id, kind, provider, credits) values (v_uid, p_kind, p_provider, p_credits) returning id into v_id;
+  return v_id;
+end $$;
+revoke all on function public.use_ai_credits(int, text, text) from public, anon;
+grant execute on function public.use_ai_credits(int, text, text) to authenticated;
+
+-- Gives the credits back when the AI request failed. Server only (users cannot refund themselves).
+create or replace function public.refund_ai_credits(p_generation_id bigint) returns boolean
+language plpgsql security definer set search_path = '' as $$
+declare v_user uuid; v_credits int;
+begin
+  update public.ai_generations set refunded = true
+   where id = p_generation_id and not refunded and created_at > now() - interval '1 hour'
+  returning user_id, credits into v_user, v_credits;
+  if v_user is null then return false; end if;
+  update public.profiles set ai_credits = ai_credits + v_credits, updated_at = now() where user_id = v_user;
+  return true;
+end $$;
+revoke all on function public.refund_ai_credits(bigint) from public, anon, authenticated;
+grant execute on function public.refund_ai_credits(bigint) to service_role;

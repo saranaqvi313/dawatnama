@@ -6,7 +6,7 @@ import { createAdminClient } from './supabase/admin'
 
 export type PaymentMethod = 'card' | 'demo'
 /** 'premium' unlocks design for the account; 'share' unlocks one card's share link. */
-export type PaymentPurpose = 'premium' | 'share' | 'credits' | 'package'
+export type PaymentPurpose = 'premium' | 'share' | 'credits' | 'package' | 'ai'
 export const isCardId = (v: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v)
 
 /**
@@ -33,11 +33,11 @@ export async function createPendingPayment(
 ) {
   const orderRef = opts.orderRef ?? newOrderRef()
   const product = PRODUCTS[opts.product ?? 'premium']
-  const purpose: PaymentPurpose = product.premium && product.credits > 0 ? 'package' : product.credits > 0 ? 'credits' : 'premium'
+  const purpose: PaymentPurpose = product.aiCredits > 0 ? 'ai' : product.premium && product.credits > 0 ? 'package' : product.credits > 0 ? 'credits' : 'premium'
   const amountPkr = serverPriceOf(product.id)
   const { error } = await createAdminClient().from('payments').insert({
     user_id: userId, order_ref: orderRef, method, amount_pkr: amountPkr, gateway_ref: opts.tracker ?? null,
-    purpose, credits: product.credits, product: product.id, return_path: safeReturn(opts.returnPath),
+    purpose, credits: purpose === 'ai' ? product.aiCredits : product.credits, product: product.id, return_path: safeReturn(opts.returnPath),
   })
   if (error) throw new Error(`Could not record payment: ${error.message}`)
   return { orderRef, amountPkr }

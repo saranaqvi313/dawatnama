@@ -365,3 +365,17 @@ test('categories: every template has one, every category has cards, ids are uniq
   }
   for (const c of CATEGORIES) assert.ok(all.some((t) => t.categories.includes(c.id)), `${c.name} has at least one card`)
 })
+
+test('AI credits: packs get cheaper per credit, Claude does not draw, every request costs something', async () => {
+  const { AI_PACKS } = await import('../src/lib/pricing')
+  const { AI_PROVIDER_IDS, aiCost } = await import('../src/lib/aiProviders')
+  assert.equal(AI_PACKS.length, 2)
+  assert.ok(AI_PACKS.every((p) => p.aiCredits > 0 && p.credits === 0 && !p.premium), 'AI packs give AI credits only')
+  assert.ok(AI_PACKS[1].price / AI_PACKS[1].aiCredits < AI_PACKS[0].price / AI_PACKS[0].aiCredits)
+  assert.equal(aiCost('claude', 'image'), null)
+  for (const p of AI_PROVIDER_IDS) {
+    assert.ok((aiCost(p, 'design') ?? 0) >= 1, `${p} design costs credits`)
+    const img = aiCost(p, 'image')
+    assert.ok(img === null || (img >= 1 && img <= 10), `${p} picture cost is in the range the database accepts`)
+  }
+})

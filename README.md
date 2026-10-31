@@ -33,9 +33,15 @@ storybook, envelope…), floating effects (petals, sparkles, fireflies…) and b
   this change (name only) stop working; send guests their new link from the guest list.
 - **Edit after sharing**: guests always see the latest card. If the details changed since a guest last opened it,
   the card shows an "Updated on …" notice. Renaming a function moves its guests and replies to the new name.
-- **AI designer**: "Create with AI" on the templates page, or the ✨ AI tab in the designer. Upload a design you
-  like (Pinterest, Canva…) and describe the card; Claude (`claude-opus-5-5`) lays it out with the designer's own
-  fonts, ornaments and scenes. Needs `ANTHROPIC_API_KEY`; `AI_DAILY_LIMIT` (default 20) per account per day.
+- **AI designer and AI pictures** (paid with AI credits, even in free mode): "Create with AI" on the templates page,
+  or the ✨ AI tab in the designer. The host picks Claude, GPT or Gemini.
+  - *Design the card*: upload a design you like (Pinterest, Canva…) and describe the card; the AI lays it out with the
+    designer's own fonts, ornaments and scenes.
+  - *Draw a picture*: GPT or Gemini draws a card background or a picture (Claude does not draw pictures).
+  - Costs (`src/lib/aiProviders.ts`): design Claude 2 / GPT 2 / Gemini 1 credits; picture GPT 3 / Gemini 2.
+    Packs: 10 credits Rs 299, 30 credits Rs 699 (`ai10`, `ai30` in `src/lib/pricing.ts`), bought through Safepay.
+  - If the AI fails, the credits are given back (needs `SUPABASE_SERVICE_ROLE_KEY`).
+  - Keys: `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY` (set only the ones you want to offer).
 - **Categories**: `/templates?category=nikah` (also walima, mehndi, birthday, eid, aqeeqa, religious, iftar…).
   The list is `src/lib/categories.ts`; each template lists its categories.
 
@@ -151,7 +157,7 @@ Import the repository, then add these **Environment Variables** (all are describ
 | `SHARE_PRICE_PKR`, `NEXT_PUBLIC_SHARE_PRICE_PKR` | `100` |
 | `OTP_PROVIDER`, `TEXTBEE_API_KEY` | `textbee`, your textbee API key |
 | `ADMIN_PHONES` | your mobile number(s), comma separated |
-| `ANTHROPIC_API_KEY`, `AI_DAILY_LIMIT` | for the AI card designer (key from console.anthropic.com; limit defaults to 20 a day) |
+| `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY` | AI designer and pictures: set the ones you want to offer (see `.env.example`) |
 | `NEXT_PUBLIC_BUSINESS_NAME`, `NEXT_PUBLIC_CONTACT_EMAIL`, `NEXT_PUBLIC_CONTACT_PHONE`, `NEXT_PUBLIC_BUSINESS_ADDRESS` | shown on Contact / Terms / Refund pages |
 | `PAYMENT_MODE` | `card` (or `demo` on Preview deployments) |
 | `SAFEPAY_ENV` | `sandbox`, later `production` |
@@ -187,7 +193,8 @@ Database security tests (on a throwaway local PostgreSQL, never your Supabase pr
 psql -d scratch -f supabase/tests/supabase_stub.sql
 psql -d scratch -f supabase/schema.sql
 psql -d scratch -f supabase/tests/premium_gate.sql   # 35 checks; rolls back
-psql -d scratch -f supabase/tests/guests_credits.sql # 42 checks; rolls back
+psql -d scratch -f supabase/tests/guests_credits.sql # rolls back
+psql -d scratch -f supabase/tests/ai_credits.sql     # AI credits; rolls back
 ```
 
 ## Security notes

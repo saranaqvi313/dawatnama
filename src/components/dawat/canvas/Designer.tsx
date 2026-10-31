@@ -4,7 +4,10 @@ import Link from 'next/link'
 import Button from '@/components/Button'
 import Icon from '@/components/Icon'
 import { saveCanvas } from '@/app/actions'
-import { generateAiDesign } from '@/app/aiActions'
+import { generateAiDesign, generateAiImage } from '@/app/aiActions'
+import BuyButton from '../BuyButton'
+import { AI_PACKS, rupees } from '@/lib/pricing'
+import { AI_PROVIDERS, AI_PROVIDER_IDS, aiCost, type AiKind, type AiProvider } from '@/lib/aiProviders'
 import { PAY_MESSAGES } from '../SharePaywall'
 import UnlockCardLink from '../UnlockCardLink'
 import QrButton from '../QrButton'
@@ -22,7 +25,9 @@ import { videoEmbed } from '@/lib/media'
 import { FREE_MODE } from '@/lib/pricing'
 import OrnamentSvg from './OrnamentSvg'
 
-type Props = { invitationId: string; userId: string; slug: string; siteUrl: string; initial: CanvasDoc; initialTitle: string; initialPublished: boolean; sharePaid: boolean; credits: number; payResult?: string; openAi?: boolean }
+type Props = { invitationId: string; userId: string; slug: string; siteUrl: string; initial: CanvasDoc; initialTitle: string; initialPublished: boolean; sharePaid: boolean; credits: number; payResult?: string; openAi?: boolean
+  /** AI credits left, and which AI models the site has keys for. */
+  aiCredits: number; aiReady: Record<AiProvider, boolean> }
 type Drag =
   | { mode: 'move'; id: string; sx: number; sy: number; ox: number; oy: number }
   | { mode: 'resize'; id: string; corner: 'nw' | 'ne' | 'sw' | 'se'; sx: number; sy: number; o: { x: number; y: number; w: number; h: number } }
@@ -45,7 +50,7 @@ const FILTER_LABEL: Record<string, string> = { none: 'Original', warm: 'Warm', c
 const MASK_LABEL: Record<string, string> = { none: 'Corners', circle: 'Circle', arch: 'Arch', heart: 'Heart', blob: 'Blob' }
 const ORNAMENT_LABEL: Record<string, string> = { mandala: 'Mandala', divider: 'Divider', corner: 'Corner', lantern: 'Lantern', crescent: 'Crescent', leaf: 'Leaves', flower: 'Flower', star: 'Star' }
 
-export default function Designer({ invitationId, userId, slug, siteUrl, initial, initialTitle, initialPublished, sharePaid: paid0, credits: credits0, payResult, openAi }: Props) {
+export default function Designer({ invitationId, userId, slug, siteUrl, initial, initialTitle, initialPublished, sharePaid: paid0, credits: credits0, payResult, openAi, aiCredits: aiCredits0, aiReady }: Props) {
   const [sharePaid, setSharePaid] = useState(paid0)
   const [credits, setCredits] = useState(credits0)
   const [doc, setDocState] = useState<CanvasDoc>(initial)
@@ -56,10 +61,15 @@ export default function Designer({ invitationId, userId, slug, siteUrl, initial,
   const [status, setStatus] = useState(payResult ? PAY_MESSAGES[payResult] ?? '' : '')
   const [busyBtn, setBusyBtn] = useState<'save' | 'publish' | ''>('')
   const [saving, setSaving] = useState(false)
-  const [panel, setPanel] = useState<'ai' | 'add' | 'element' | 'background' | 'magic' | 'layers' | 'share'>(payResult ? 'share' : openAi ? 'ai' : 'add')
+  const [panel, setPanel] = useState<'ai' | 'add' | 'element' | 'background' | 'magic' | 'layers' | 'share'>(openAi ? 'ai' : payResult ? 'share' : 'add')
   const [aiPrompt, setAiPrompt] = useState('')
   const [aiImage, setAiImage] = useState('')
   const [aiBusy, setAiBusy] = useState(false)
+  const [aiKind, setAiKind] = useState<AiKind>('design')
+  const [aiProvider, setAiProvider] = useState<AiProvider>(() => AI_PROVIDER_IDS.find((p) => aiReady[p]) ?? 'claude')
+  const [aiUse, setAiUse] = useState<'background' | 'picture'>('background')
+  const [aiCredits, setAiCredits] = useState(aiCredits0)
+  const aiPrice = aiCost(aiProvider, aiKind)
   const [playKey, setPlayKey] = useState(0)
   const [playing, setPlaying] = useState(false)
   const [guides, setGuides] = useState<{ v: boolean; h: boolean }>({ v: false, h: false })
@@ -330,14 +340,30 @@ export default function Designer({ invitationId, userId, slug, siteUrl, initial,
   }
   /** AI designer: replaces the card with a new design (one undo step, not saved until the host saves). */
   async function runAi() {
-    setAiBusy(true); setStatus('The AI is designing your card. This can take up to a minute…')
-    const res = await generateAiDesign(invitationId, { prompt: aiPrompt, imageUrl: aiImage || undefined })
+    setAiBusy(true)
+    if (aiKind === 'image') {
+      setStatus(`${AI_PROVIDERS[aiProvider].name} is drawing your picture. This can take up to a minute…`)
+      const res = await generateAiImage(invitationId, { provider: aiProvider, prompt: aiPrompt, use: aiUse })
+      setAiBusy(false)
+      if (res.credits !== undefined) setAiCredits(res.credits)
+      if (!res.ok) return setStatus(res.error)
+      if (aiUse === 'background') updateBg({ image: res.url, imageOpacity: 1 })
+      else {
+        const el = { ...createElement('image', undefined, accent, ink), src: res.url, radius: 0, border: 0, w: 240, h: 240, x: (CW - 240) / 2, y: 120 } as ImageEl
+        commit({ ...docRef.current, elements: [...docRef.current.elements, el] })
+        setSelected(el.id)
+      }
+      return setStatus('Picture added. Not saved yet: press Save to keep it, or Undo to go back.')
+    }
+    setStatus(`${AI_PROVIDERS[aiProvider].name} is designing your card. This can take up to a minute…`)
+    const res = await generateAiDesign(invitationId, { provider: aiProvider, prompt: aiPrompt, imageUrl: aiImage || undefined })
     setAiBusy(false)
+    if (res.credits !== undefined) setAiCredits(res.credits)
     if (!res.ok) return setStatus(res.error)
     commit(res.doc)
     setSelected(null)
     if (res.title && /^(my card|my ai card|designer card)$/i.test(title.trim())) setTitle(res.title)
-    setStatus(`${res.summary} Not saved yet: press Save to keep it, or Undo to go back.${res.left !== undefined ? ` (${res.left} AI designs left today)` : ''}`)
+    setStatus(`${res.summary} Not saved yet: press Save to keep it, or Undo to go back.`)
   }
 
   async function uploadMusic(file: File | undefined) {
@@ -379,24 +405,91 @@ export default function Designer({ invitationId, userId, slug, siteUrl, initial,
         <div className="dz-body">
           {panel === 'ai' && (
             <>
-              <p className="dz-hint">Show the AI a design you like (a screenshot from Pinterest, Canva or Instagram) and tell it about your event. It builds the card here; then you can change anything.</p>
-              <Section title="1. A design you like">
-                {aiImage && <img src={aiImage} alt="Your reference design" className="w-full max-h-64 object-contain rounded-2xl bg-b-surface2" />}
-                <label className="file">{aiImage ? 'Use another picture' : 'Upload a picture (optional)'}
-                  <input type="file" accept="image/png,image/jpeg,image/webp" disabled={aiBusy} onChange={(e) => upload(e.target.files?.[0], setAiImage)} />
-                </label>
-                {aiImage && <button type="button" className="link" onClick={() => setAiImage('')}>Remove picture</button>}
+              <div className="flex items-center gap-3 p-4 rounded-3xl border border-s-subtle bg-b-depth2">
+                <div className="grow">
+                  <div className="text-caption text-t-secondary">Your AI credits</div>
+                  <div className="text-h5">{aiCredits}</div>
+                </div>
+                <span className="text-caption text-t-secondary text-right">Each AI request uses credits.<br />Credits never expire.</span>
+              </div>
+              {aiCredits < (aiPrice ?? 1) && (
+                <Section title="Buy AI credits">
+                  <p className="dz-hint">AI designs and pictures are a paid extra, because every request is paid to the AI company. If the AI fails, your credits are given back.</p>
+                  <div className="two">
+                    {AI_PACKS.map((p) => (
+                      <BuyButton key={p.id} product={p} returnTo={`/design/${invitationId}?ai=1`} ghost={p.id !== 'ai30'}
+                        label={`${p.aiCredits} credits · ${rupees(p.price)}`} />
+                    ))}
+                  </div>
+                </Section>
+              )}
+
+              <div className="chips" role="radiogroup" aria-label="What should the AI make?">
+                <button type="button" role="radio" aria-checked={aiKind === 'design'} className={aiKind === 'design' ? 'on' : ''} onClick={() => setAiKind('design')}>Design the card</button>
+                <button type="button" role="radio" aria-checked={aiKind === 'image'} className={aiKind === 'image' ? 'on' : ''}
+                  onClick={() => { setAiKind('image'); if (aiProvider === 'claude') setAiProvider(aiReady.gemini || !aiReady.gpt ? 'gemini' : 'gpt') }}>Draw a picture</button>
+              </div>
+
+              <Section title="Choose the AI">
+                <div className="grid gap-2">
+                  {AI_PROVIDER_IDS.map((p) => {
+                    const cost = aiCost(p, aiKind)
+                    const off = !aiReady[p] || cost === null
+                    return (
+                      <label key={p} className={`check${off ? ' dim' : ''}`}>
+                        <input type="radio" name="ai-provider" checked={aiProvider === p} disabled={off || aiBusy} onChange={() => setAiProvider(p)} />
+                        <span className="grow"><b>{AI_PROVIDERS[p].name}</b> <span className="text-t-secondary">by {AI_PROVIDERS[p].by} · {cost === null ? 'cannot draw pictures' : !aiReady[p] ? 'not set up yet' : AI_PROVIDERS[p].note}</span></span>
+                        {cost !== null && <span className="text-caption text-t-secondary whitespace-nowrap">{cost} credit{cost === 1 ? '' : 's'}</span>}
+                      </label>
+                    )
+                  })}
+                </div>
               </Section>
-              <Section title="2. Describe your card">
-                <label>Names, event, date, time, venue, colours, anything to change from the picture
-                  <textarea rows={7} maxLength={2000} value={aiPrompt} disabled={aiBusy} dir="auto" onChange={(e) => setAiPrompt(e.target.value)}
-                    placeholder={'Nikah of Ayesha & Hamza\nSaturday 20 December 2026, 7 pm\nServis Marquee, Lahore\nLike the picture but in emerald green and gold, with our photo in an arch'} />
-                </label>
-              </Section>
-              <Button isBlack className="w-full" disabled={aiBusy || (!aiImage && aiPrompt.trim().length < 10)} aria-busy={aiBusy || undefined} onClick={runAi}>
-                {aiBusy ? 'Designing… (up to a minute)' : doc.elements.length ? 'Design my card (replaces this design)' : 'Design my card'}
+
+              {aiKind === 'design' ? (
+                <>
+                  <p className="dz-hint">Show the AI a design you like (a screenshot from Pinterest, Canva or Instagram) and tell it about your event. It builds the card here; then you can change anything.</p>
+                  <Section title="1. A design you like">
+                    {aiImage && <img src={aiImage} alt="Your reference design" className="w-full max-h-64 object-contain rounded-2xl bg-b-surface2" />}
+                    <label className="file">{aiImage ? 'Use another picture' : 'Upload a picture (optional)'}
+                      <input type="file" accept="image/png,image/jpeg,image/webp" disabled={aiBusy} onChange={(e) => upload(e.target.files?.[0], setAiImage)} />
+                    </label>
+                    {aiImage && <button type="button" className="link" onClick={() => setAiImage('')}>Remove picture</button>}
+                  </Section>
+                  <Section title="2. Describe your card">
+                    <label>Names, event, date, time, venue, colours, anything to change from the picture
+                      <textarea rows={7} maxLength={2000} value={aiPrompt} disabled={aiBusy} dir="auto" onChange={(e) => setAiPrompt(e.target.value)}
+                        placeholder={'Nikah of Ayesha & Hamza\nSaturday 20 December 2026, 7 pm\nServis Marquee, Lahore\nLike the picture but in emerald green and gold, with our photo in an arch'} />
+                    </label>
+                  </Section>
+                </>
+              ) : (
+                <>
+                  <p className="dz-hint">The AI draws a new picture for your card: background art, a floral frame, an illustration. It never writes text in the picture; your card adds the words.</p>
+                  <Section title="Where it goes">
+                    <div className="chips">
+                      <button type="button" className={aiUse === 'background' ? 'on' : ''} onClick={() => setAiUse('background')}>Card background</button>
+                      <button type="button" className={aiUse === 'picture' ? 'on' : ''} onClick={() => setAiUse('picture')}>Picture on the card</button>
+                    </div>
+                  </Section>
+                  <Section title="Describe the picture">
+                    <label>Colours, flowers, style, mood
+                      <textarea rows={5} maxLength={1000} value={aiPrompt} disabled={aiBusy} dir="auto" onChange={(e) => setAiPrompt(e.target.value)}
+                        placeholder={aiUse === 'background' ? 'Deep emerald background with gold Mughal jaali arches and soft roses in the corners' : 'Watercolour bouquet of red roses and marigolds'} />
+                    </label>
+                  </Section>
+                </>
+              )}
+
+              <Button isBlack className="w-full" aria-busy={aiBusy || undefined} onClick={runAi}
+                disabled={aiBusy || aiPrice === null || !aiReady[aiProvider] || aiCredits < (aiPrice ?? 1) || (aiKind === 'design' ? !aiImage && aiPrompt.trim().length < 10 : aiPrompt.trim().length < 5)}>
+                {aiBusy ? 'Working… (up to a minute)'
+                  : aiKind === 'image' ? `Draw it · ${aiPrice ?? '-'} credit${aiPrice === 1 ? '' : 's'}`
+                    : `${doc.elements.length ? 'Design my card (replaces this design)' : 'Design my card'} · ${aiPrice} credit${aiPrice === 1 ? '' : 's'}`}
               </Button>
-              <p className="dz-hint">The AI uses this designer&apos;s fonts, ornaments and scenes, so the result is close to the picture, not an exact copy. Photo frames are left empty for you to add your own photos. Not happy? Undo brings back the previous card.</p>
+              <p className="dz-hint">{aiKind === 'design'
+                ? 'The AI uses this designer’s fonts, ornaments and scenes, so the result is close to the picture, not an exact copy. Photo frames are left empty for your own photos. Not happy? Undo brings back the previous card.'
+                : 'Not happy? Undo removes the picture. Your credits are given back if the AI fails.'}</p>
             </>
           )}
 

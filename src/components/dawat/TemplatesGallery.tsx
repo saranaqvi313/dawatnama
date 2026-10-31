@@ -69,7 +69,7 @@ export default function TemplatesGallery({ limit, compact, category, base = '/te
             <SubmitButton plain className="group flex flex-col items-center justify-center gap-3 w-full aspect-[3/4] rounded-3xl border-2 border-dashed border-s-stroke2 text-t-secondary transition-colors hover:border-s-highlight hover:text-t-primary">
               <span className="flex items-center justify-center size-14 rounded-full bg-b-surface2 shadow-depth-toggle"><Icon className="fill-inherit" name="magic-pencil" /></span>
               <span className="text-sub-title-1">Create with AI</span>
-              <span className="px-4 text-caption text-center">Upload a design you like (Pinterest, Canva…) and describe your card</span>
+              <span className="px-4 text-caption text-center">Upload a design you like (Pinterest, Canva…). Claude, GPT or Gemini, with AI credits</span>
             </SubmitButton>
           </form>
         )}
