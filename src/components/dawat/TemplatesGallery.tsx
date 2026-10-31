@@ -53,7 +53,7 @@ export default function TemplatesGallery({ limit, compact, category, base = '/te
     <div>
       {!compact && <CategoryNav active={category} base={base} />}
       <Section title={cat ? `${cat.name} cards` : 'Ready-made cards'}
-        note={cat ? `${cat.note}. Pick one and change anything, or open it in the designer.` : 'Pick one and change anything: names, dates, colours, photos, animations. “Quick edit” is a simple form; “Design freely” opens the drag-and-drop designer.'}>
+        note={cat ? `${cat.note}. Pick one and change anything, or open it in the designer.` : 'Pick one and change anything: names, dates, colours, photos, animations. “Quick edit” is a simple form; “Design” opens the drag-and-drop designer.'}>
         {!compact && (
           <form action={createBlankCard} className="flex flex-col">
             <SubmitButton plain className="group flex flex-col items-center justify-center gap-3 w-full aspect-[3/4] rounded-3xl border-2 border-dashed border-s-stroke2 text-t-secondary transition-colors hover:border-s-highlight hover:text-t-primary">
@@ -94,7 +94,7 @@ export default function TemplatesGallery({ limit, compact, category, base = '/te
               </form>
               <form action={createDesignFromTemplate} className="flex-1">
                 <input type="hidden" name="template" value={t.id} />
-                <SubmitButton className={`w-full ${small}`} isBlack>Design freely</SubmitButton>
+                <SubmitButton className={`w-full ${small}`} isBlack>Design</SubmitButton>
               </form>
             </div>
           </article>

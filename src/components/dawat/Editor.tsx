@@ -134,7 +134,7 @@ export default function Editor({ invitation, siteUrl, premium, sharePaid: paid0,
             <div className="text-h6 truncate" dir="auto">{names}</div>
             <span className={`label ${published ? 'label-green' : 'label-gray'}`}>{published ? 'Live' : 'Draft'}</span>
           </div>
-          <Button isStroke icon="magic-pencil" className="gap-2 max-md:!px-4" onClick={openInDesigner} disabled={converting} aria-busy={converting || undefined}>Design freely</Button>
+          <Button isStroke icon="magic-pencil" className="gap-2 max-md:!px-4" onClick={openInDesigner} disabled={converting} aria-busy={converting || undefined}>Design</Button>
           <Button isStroke onClick={() => save()} disabled={pending} aria-busy={saving === 'save' || undefined}>Save</Button>
           <Button isBlack as="link" href={guestsHref} onClick={() => { void persist(published) }}>Guests</Button>
         </div>

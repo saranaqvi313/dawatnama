@@ -532,6 +532,9 @@ html.navigating * {
 .dn-designer textarea {
     @apply h-auto py-2.5 rounded-2xl resize-y;
 }
+.dn-designer textarea[data-square] {
+    @apply rounded-none;
+}
 .dn-designer input[type="color"]:not([class]) {
     @apply w-full h-10 p-1 border border-s-stroke2 rounded-full bg-b-surface2 cursor-pointer [&::-webkit-color-swatch-wrapper]:p-0 [&::-webkit-color-swatch]:rounded-full [&::-webkit-color-swatch]:border-0 [&::-moz-color-swatch]:rounded-full;
 }

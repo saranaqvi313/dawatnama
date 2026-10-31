@@ -432,7 +432,7 @@ export default function Designer({ invitationId, userId, slug, siteUrl, initial,
 
               <Section title="Choose the AI">
                 <div className="grid gap-2">
-                  {AI_PROVIDER_IDS.map((p) => {
+                  {AI_PROVIDER_IDS.filter((p) => aiCost(p, aiKind) !== null).map((p) => {
                     const cost = aiCost(p, aiKind)
                     const off = !aiReady[p] || cost === null
                     return (
@@ -458,7 +458,7 @@ export default function Designer({ invitationId, userId, slug, siteUrl, initial,
                   </Section>
                   <Section title="2. Describe your card">
                     <label>Names, event, date, time, venue, colours, anything to change from the picture
-                      <textarea rows={7} maxLength={2000} value={aiPrompt} disabled={aiBusy} dir="auto" onChange={(e) => setAiPrompt(e.target.value)}
+                      <textarea data-square rows={7} maxLength={2000} value={aiPrompt} disabled={aiBusy} dir="auto" onChange={(e) => setAiPrompt(e.target.value)}
                         placeholder={'Nikah of Ayesha & Hamza\nSaturday 20 December 2026, 7 pm\nServis Marquee, Lahore\nLike the picture but in emerald green and gold, with our photo in an arch'} />
                     </label>
                   </Section>
@@ -474,7 +474,7 @@ export default function Designer({ invitationId, userId, slug, siteUrl, initial,
                   </Section>
                   <Section title="Describe the picture">
                     <label>Colours, flowers, style, mood
-                      <textarea rows={5} maxLength={1000} value={aiPrompt} disabled={aiBusy} dir="auto" onChange={(e) => setAiPrompt(e.target.value)}
+                      <textarea data-square rows={5} maxLength={1000} value={aiPrompt} disabled={aiBusy} dir="auto" onChange={(e) => setAiPrompt(e.target.value)}
                         placeholder={aiUse === 'background' ? 'Deep emerald background with gold Mughal jaali arches and soft roses in the corners' : 'Watercolour bouquet of red roses and marigolds'} />
                     </label>
                   </Section>
