@@ -1,5 +1,5 @@
 'use client'
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import Card from '@/components/Card'
@@ -54,6 +54,8 @@ function EventChecks({ eventNames, value, onChange }: { eventNames: string[]; va
 export default function GuestManager({ card, initialGuests, replies, eventNames, credits, siteUrl, payResult }: Props) {
   const router = useRouter()
   const [guests, setGuests] = useState(initialGuests)
+  // New guests (and their secret link codes) arrive with the refreshed page data.
+  useEffect(() => setGuests(initialGuests), [initialGuests])
   const [selected, setSelected] = useState<string[]>([])
   const [status, setStatus] = useState(payResult ? PAY[payResult] ?? '' : '')
   const [busy, setBusy] = useState('')
@@ -63,7 +65,7 @@ export default function GuestManager({ card, initialGuests, replies, eventNames,
   const [edit, setEdit] = useState<Draft>(() => emptyDraft(eventNames))
   const fileInput = useRef<HTMLInputElement>(null)
   const stats = useMemo(() => guestStats(guests, replies, eventNames), [guests, replies, eventNames])
-  const linkOf = (g: GuestRow) => `${siteUrl}/${g.slug}`
+  const linkOf = (g: GuestRow) => `${siteUrl}/${g.slug}/${g.token}`
   const host = siteUrl.replace(/^https?:\/\//, '')
   const back = `/dashboard/${card.id}/guests`
   const editorHref = card.kind === 'canvas' ? `/design/${card.id}` : `/dashboard/${card.id}`
@@ -303,7 +305,10 @@ export default function GuestManager({ card, initialGuests, replies, eventNames,
             <Field className="w-28" innerLabel="People" type="number" min={1} max={50} value={edit.party} onChange={(e) => setEdit({ ...edit, party: e.target.value })} />
           </div>
           {editing && !editing.link_active && (
-            <Field innerLabel={`Link · ${host}/`} dir="ltr" value={edit.slug} onChange={(e) => setEdit({ ...edit, slug: e.target.value })} />
+            <div>
+              <Field innerLabel={`Link · ${host}/`} dir="ltr" value={edit.slug} onChange={(e) => setEdit({ ...edit, slug: e.target.value })} />
+              <div className="mt-2 text-caption text-t-secondary">A secret code is added after the name (…/{edit.slug || 'name'}/{editing.token}), so nobody can open this card by typing a different name.</div>
+            </div>
           )}
           <EventChecks eventNames={eventNames} value={edit.events} onChange={(events) => setEdit({ ...edit, events })} />
         </div>

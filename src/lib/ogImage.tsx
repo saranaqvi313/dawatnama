@@ -15,8 +15,8 @@ async function googleFont(family: string, text: string): Promise<ArrayBuffer | n
 }
 const familyOf = (key: string) => (FONTS[key]?.css.match(/'([^']+)'/)?.[1]) ?? 'Pinyon Script'
 
-export async function cardImage(slug: string) {
-  const found = await loadPublicCard(slug)
+export async function cardImage(slug: string, token?: string) {
+  const found = await loadPublicCard(slug, token)
   let bg = '#12382d', ink = '#f6efdc', accent = '#d4af37', names = 'You are invited', kicker = 'Dawatnama', when = '', nameFamily = 'Pinyon Script', photo = ''
   if (found && found.card.kind !== 'canvas') {
     const { content, design } = normalize(found.card.content as never, found.card.design as never, found.card.template)

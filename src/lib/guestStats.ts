@@ -1,6 +1,6 @@
 /** Numbers for the guest dashboard: who is coming, food headcount per function, who opened the card. */
 export type GuestRow = {
-  id: string; name: string; phone: string | null; slug: string; party_size: number; events: string[]
+  id: string; name: string; phone: string | null; slug: string; token: string; party_size: number; events: string[]
   link_active: boolean; open_count: number; opened_at: string | null; last_opened_at: string | null; reminded_at: string | null
 }
 export type ReplyRow = { guest_id: string | null; event_name: string | null; attending: 'yes' | 'no' | 'maybe'; guests: number; name?: string }
@@ -48,4 +48,19 @@ export function replySummary(guestId: string, replies: ReplyRow[]) {
 export function whatsappHref(phone: string | null, text: string) {
   const digits = (phone ?? '').replace(/\D/g, '')
   return `https://wa.me/${digits}?text=${encodeURIComponent(text)}`
+}
+
+/**
+ * Functions whose name was changed in place (same position, old name gone). Guests are invited to
+ * functions by name, so their invitations and replies move to the new name.
+ */
+export function renamedEvents(before: { name?: string }[] | undefined, after: { name?: string }[] | undefined) {
+  const old = (Array.isArray(before) ? before : []).map((e) => String(e?.name ?? '').trim())
+  const now = (Array.isArray(after) ? after : []).map((e) => String(e?.name ?? '').trim())
+  const from: string[] = [], to: string[] = []
+  old.forEach((name, i) => {
+    const next = now[i]
+    if (name && next && name !== next && !now.includes(name) && !from.includes(name)) { from.push(name); to.push(next) }
+  })
+  return { from: from.slice(0, 20), to: to.slice(0, 20) }
 }

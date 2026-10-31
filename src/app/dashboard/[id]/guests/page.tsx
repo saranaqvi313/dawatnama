@@ -18,7 +18,7 @@ export default async function GuestsPage({ params, searchParams }: { params: Pro
   const { data: card } = await supabase.from('invitations').select('id, slug, kind, content, published, share_paid, open_count').eq('id', id).eq('user_id', auth.user.id).maybeSingle()
   if (!card) notFound()
   const [{ data: guests }, { data: replies }, credits] = await Promise.all([
-    supabase.from('guests').select('id, name, phone, slug, party_size, events, link_active, open_count, opened_at, last_opened_at, reminded_at').eq('invitation_id', id).order('created_at'),
+    supabase.from('guests').select('id, name, phone, slug, token, party_size, events, link_active, open_count, opened_at, last_opened_at, reminded_at').eq('invitation_id', id).order('created_at'),
     supabase.from('rsvps').select('guest_id, event_name, attending, guests, name').eq('invitation_id', id),
     linkCredits(supabase, auth.user.id),
   ])

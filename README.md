@@ -23,6 +23,24 @@ shapes and filters; uploaded videos or YouTube/Vimeo links; shapes, ornaments an
 and an optional link on every element; long cards that scroll; and for the whole card an opening (palace gates,
 storybook, envelope…), floating effects (petals, sparkles, fireflies…) and background music.
 
+## Card analytics, secure guest links, AI designer, categories
+
+- **Analytics** (`/dashboard/[id]/analytics`, the button under every card on My cards): total opens, people who
+  opened (one per phone), replies and response rate, people coming per function, opens and replies per day, and
+  who opened but has not replied (with a WhatsApp reminder). Visits are logged in `card_views`.
+- **Secure guest links**: every guest link carries a secret code made by the database,
+  `your-site.com/ali-khan/3f9a1c7b2d4e`. Changing the name in the address opens nothing. Links sent before
+  this change (name only) stop working; send guests their new link from the guest list.
+- **Edit after sharing**: guests always see the latest card. If the details changed since a guest last opened it,
+  the card shows an "Updated on …" notice. Renaming a function moves its guests and replies to the new name.
+- **AI designer**: "Create with AI" on the templates page, or the ✨ AI tab in the designer. Upload a design you
+  like (Pinterest, Canva…) and describe the card; Claude (`claude-opus-5-5`) lays it out with the designer's own
+  fonts, ornaments and scenes. Needs `ANTHROPIC_API_KEY`; `AI_DAILY_LIMIT` (default 20) per account per day.
+- **Categories**: `/templates?category=nikah` (also walima, mehndi, birthday, eid, aqeeqa, religious, iftar…).
+  The list is `src/lib/categories.ts`; each template lists its categories.
+
+After pulling this change, run `supabase/schema.sql` again in the Supabase SQL editor (safe to re-run).
+
 ## Project layout
 
 | Folder | What |
@@ -133,6 +151,7 @@ Import the repository, then add these **Environment Variables** (all are describ
 | `SHARE_PRICE_PKR`, `NEXT_PUBLIC_SHARE_PRICE_PKR` | `100` |
 | `OTP_PROVIDER`, `TEXTBEE_API_KEY` | `textbee`, your textbee API key |
 | `ADMIN_PHONES` | your mobile number(s), comma separated |
+| `ANTHROPIC_API_KEY`, `AI_DAILY_LIMIT` | for the AI card designer (key from console.anthropic.com; limit defaults to 20 a day) |
 | `NEXT_PUBLIC_BUSINESS_NAME`, `NEXT_PUBLIC_CONTACT_EMAIL`, `NEXT_PUBLIC_CONTACT_PHONE`, `NEXT_PUBLIC_BUSINESS_ADDRESS` | shown on Contact / Terms / Refund pages |
 | `PAYMENT_MODE` | `card` (or `demo` on Preview deployments) |
 | `SAFEPAY_ENV` | `sandbox`, later `production` |

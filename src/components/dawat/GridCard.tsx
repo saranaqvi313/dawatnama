@@ -7,6 +7,8 @@ type Props = {
   badge?: ReactNode
   details?: ReactNode
   actions?: ReactNode
+  /** Always visible under the tile (e.g. a main button). */
+  footer?: ReactNode
   /** Height of the picture area (kit default h-57.5). */
   thumbClass?: string
   className?: string
@@ -16,7 +18,7 @@ type Props = {
  * One tile in a kit-style grid (same layout as the kit's product grid): picture, title, a label on
  * the right, and actions that appear on hover (tap on phones).
  */
-export default function GridCard({ title, thumb, badge, details, actions, thumbClass, className }: Props) {
+export default function GridCard({ title, thumb, badge, details, actions, footer, thumbClass, className }: Props) {
   const [visible, setVisible] = useState(false)
   return (
     <div
@@ -41,6 +43,7 @@ export default function GridCard({ title, thumb, badge, details, actions, thumbC
           </div>
         )}
       </div>
+      {footer && <div className="mt-3" onClick={(e) => e.stopPropagation()}>{footer}</div>}
     </div>
   )
 }

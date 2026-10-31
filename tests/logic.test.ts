@@ -152,7 +152,9 @@ test('card links: your-site.com/<guest-name>', () => {
 })
 
 import { parseCsv, rowsToGuests } from '../src/lib/sheet'
-import { guestStats, replySummary, whatsappHref, type GuestRow } from '../src/lib/guestStats'
+import { cardAnalytics } from '../src/lib/cardAnalytics'
+import { CATEGORIES, isCategory } from '../src/lib/categories'
+import { guestStats, renamedEvents, replySummary, whatsappHref, type GuestRow } from '../src/lib/guestStats'
 import { videoEmbed } from '../src/lib/media'
 import { PRODUCTS, serverPriceOf } from '../src/lib/pricing'
 import { hashCode, newCode } from '../src/lib/otp'
@@ -169,7 +171,7 @@ test('guest list upload: CSV with headers in any order', () => {
 })
 
 test('guest dashboard: food headcount per function and who opened', () => {
-  const g = (id: string, events: string[], live = true, opens = 0): GuestRow => ({ id, name: id, phone: null, slug: id, party_size: 3, events, link_active: live, open_count: opens, opened_at: null, last_opened_at: null, reminded_at: null })
+  const g = (id: string, events: string[], live = true, opens = 0): GuestRow => ({ id, name: id, phone: null, slug: id, token: `${id}token000000`, party_size: 3, events, link_active: live, open_count: opens, opened_at: null, last_opened_at: null, reminded_at: null })
   const guests = [g('a', []), g('b', ['Mehndi'], true, 2), g('c', ['Baraat'], false)]
   const replies = [
     { guest_id: 'a', event_name: 'Mehndi', attending: 'yes' as const, guests: 3 },
@@ -181,6 +183,15 @@ test('guest dashboard: food headcount per function and who opened', () => {
   assert.deepEqual(s.perEvent.map((e) => [e.event, e.coming, e.declined, e.waiting]), [['Mehndi', 5, 0, 1], ['Baraat', 0, 1, 0]])
   assert.equal(replySummary('a', replies), 'Mehndi: coming (3) · Baraat: can\'t come')
   assert.equal(whatsappHref('+92 300 1234567', 'Hi & bye'), 'https://wa.me/923001234567?text=Hi%20%26%20bye')
+})
+
+test('renaming a function moves its guests and replies; reordering does not', () => {
+  const ev = (...names: string[]) => names.map((name) => ({ name }))
+  assert.deepEqual(renamedEvents(ev('Nikah', 'Walima'), ev('Nikah & Rukhsati', 'Walima')), { from: ['Nikah'], to: ['Nikah & Rukhsati'] })
+  assert.deepEqual(renamedEvents(ev('Mehndi', 'Baraat'), ev('Baraat', 'Mehndi')), { from: [], to: [] }, 'swapped order is not a rename')
+  assert.deepEqual(renamedEvents(ev('Mehndi', 'Baraat'), ev('Mehndi')), { from: [], to: [] }, 'a removed function is not a rename')
+  assert.deepEqual(renamedEvents(undefined, ev('Nikah')), { from: [], to: [] })
+  assert.deepEqual(renamedEvents(ev('Dholki', ''), ev('Dholki night', 'Mayun')), { from: ['Dholki'], to: ['Dholki night'] }, 'unnamed functions are skipped')
 })
 
 test('video links: YouTube, Vimeo, uploaded files; nothing else', () => {
@@ -309,4 +320,48 @@ test('every ready-made template opens in the designer', async () => {
     assert.ok(doc.elements.every((e) => e.y + e.h <= doc.h + 1), `${t.id} fits on the card`)
     assert.deepEqual(sanitizeCanvas(doc), doc, `${t.id} is already valid`)
   }
+})
+
+test('card analytics: unique visitors, people coming across functions, who to remind', () => {
+  const g = (id: string, opens: number, live = true): GuestRow => ({ id, name: id, phone: null, slug: id, token: `${id}token000000`, party_size: 4, events: [], link_active: live, open_count: opens, opened_at: null, last_opened_at: null, reminded_at: null })
+  const now = new Date('2026-11-10T12:00:00Z')
+  const a = cardAnalytics({
+    openLinkOpens: 5,
+    guests: [g('ali', 2), g('hina', 1), g('zara', 0), g('omar', 0, false)],
+    replies: [
+      { guest_id: 'ali', event_name: 'Mehndi', attending: 'yes', guests: 3, name: 'ali', created_at: '2026-11-10T08:00:00Z' },
+      { guest_id: 'ali', event_name: 'Baraat', attending: 'yes', guests: 2, name: 'ali', created_at: '2026-11-10T08:00:00Z' },
+      { guest_id: null, event_name: 'Mehndi', attending: 'no', guests: 0, name: 'Bilal', created_at: '2026-11-09T08:00:00Z' },
+      { guest_id: null, event_name: 'Baraat', attending: 'no', guests: 0, name: 'bilal ', created_at: '2026-11-09T08:00:00Z' },
+    ],
+    views: [
+      { guest_id: null, visitor: 'phone-aaaa', created_at: '2026-11-10T07:00:00Z' },
+      { guest_id: null, visitor: 'phone-aaaa', created_at: '2026-11-09T07:00:00Z' },
+      { guest_id: null, visitor: 'phone-bbbb', created_at: '2026-11-09T07:00:00Z' },
+      { guest_id: 'ali', visitor: 'phone-cccc', created_at: '2026-11-10T07:00:00Z' },
+    ],
+    eventNames: ['Mehndi', 'Baraat'], now,
+  })
+  assert.equal(a.totalOpens, 8, 'open link + guest opens')
+  assert.equal(a.linkVisitors, 2, 'one per phone on the open link')
+  assert.equal(a.peopleOpened, 4, '2 guests + 2 phones')
+  assert.equal(a.respondents, 2, 'Bilal counted once across functions')
+  assert.equal(a.comingPeople, 3, 'largest yes per person, not the sum over functions')
+  assert.equal(a.declinedRespondents, 1)
+  assert.equal(a.responseRate, 33, '1 of 3 live guests replied')
+  assert.deepEqual(a.openedNoReply.map((x) => x.id), ['hina'])
+  assert.deepEqual(a.notOpened.map((x) => x.id), ['zara'], 'links that are not live are not listed')
+  assert.equal(a.daily.length, 14)
+  assert.deepEqual(a.daily.slice(-2).map((d) => [d.opens, d.replies]), [[2, 1], [2, 1]])
+})
+
+test('categories: every template has one, every category has cards, ids are unique', async () => {
+  const { TEMPLATES } = await import('../src/lib/types')
+  const all = [...TEMPLATES, ...CANVAS_TEMPLATES]
+  assert.equal(new Set(all.map((t) => t.id)).size, all.length, 'template ids are unique')
+  for (const t of all) {
+    assert.ok(t.categories.length > 0, `${t.id} has a category`)
+    for (const c of t.categories) assert.ok(isCategory(c), `${t.id}: ${c} is a category`)
+  }
+  for (const c of CATEGORIES) assert.ok(all.some((t) => t.categories.includes(c.id)), `${c.name} has at least one card`)
 })

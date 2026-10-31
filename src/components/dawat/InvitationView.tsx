@@ -8,7 +8,7 @@ import { submitGuestRsvp, submitRsvp } from '@/app/actions'
 import { createClient } from '@/lib/supabase/client'
 import { videoEmbed } from '@/lib/media'
 
-export type CardGuest = { id: string; name: string; party_size: number; events: string[]; slug: string }
+export type CardGuest = { id: string; name: string; party_size: number; events: string[]; slug: string; token?: string; last_opened_at?: string | null }
 
 function artwork(kind: string, accent: string) {
   const c = encodeURIComponent(accent)
@@ -87,7 +87,7 @@ export function RsvpForm({ invitationId, t, events, guest, slug, demo }: {
   const [chosen, setReplies] = useState<Record<string, Reply>>({})
   // Functions can be added or removed while editing, so every one falls back to a default reply.
   const replies = Object.fromEntries(keys.map((k) => [k, chosen[k] ?? fallback])) as Record<string, Reply>
-  const canSend = Boolean(guest ? slug : invitationId) && !demo
+  const canSend = Boolean(guest ? slug && guest.token : invitationId) && !demo
   const set = (k: string, r: Partial<Reply>) => setReplies((x) => ({ ...x, [k]: { ...(x[k] ?? fallback), ...r } }))
 
   async function onSubmit(ev: FormEvent<HTMLFormElement>) {
@@ -96,8 +96,8 @@ export function RsvpForm({ invitationId, t, events, guest, slug, demo }: {
     const f = new FormData(ev.currentTarget)
     const rows = keys.map((k) => ({ event: k || undefined, attending: replies[k].attending, guests: replies[k].guests }))
     setState('busy')
-    const res = guest && slug
-      ? await submitGuestRsvp({ slug, message: String(f.get('message') || ''), rows })
+    const res = guest && slug && guest.token
+      ? await submitGuestRsvp({ slug, token: guest.token, message: String(f.get('message') || ''), rows })
       : await submitRsvp({ invitationId: invitationId!, name: String(f.get('name') || ''), message: String(f.get('message') || ''), rows })
     setState(res.ok ? 'done' : 'error')
   }
@@ -129,14 +129,48 @@ export function RsvpForm({ invitationId, t, events, guest, slug, demo }: {
   )
 }
 
-/** Counts a visit to a live link (the owner's own visits are skipped by the database). */
-export function OpenTracker({ slug }: { slug: string }) {
+/** A random id kept on this phone, so the card's analytics can count unique visitors. */
+function visitorId() {
+  try {
+    let id = localStorage.getItem('dn-visitor')
+    if (!id) { id = `v${Math.random().toString(36).slice(2)}${Date.now().toString(36)}`.slice(0, 40); localStorage.setItem('dn-visitor', id) }
+    return id
+  } catch { return null }
+}
+
+/** Counts a visit to a live link (the owner's own visits are skipped by the database). Guest links send their secret code. */
+export function OpenTracker({ slug, token }: { slug: string; token?: string }) {
   useEffect(() => {
-    const key = `opened:${slug}`
+    const key = `opened:${slug}${token ? `/${token}` : ''}`
     try { if (sessionStorage.getItem(key)) return; sessionStorage.setItem(key, '1') } catch { /* private mode */ }
-    void createClient().rpc('record_open', { p_slug: slug })
-  }, [slug])
+    void createClient().rpc('record_open', { p_slug: slug, p_token: token ?? null, p_visitor: visitorId() })
+  }, [slug, token])
   return null
+}
+
+/**
+ * "The details were updated": shown when the host changed the card (time, venue…) after this guest
+ * last saw it. Remembered per phone; a guest link also knows when the guest last opened it.
+ */
+export function UpdatedNotice({ slug, updatedAt, lastOpenedAt }: { slug: string; updatedAt?: string | null; lastOpenedAt?: string | null }) {
+  const [show, setShow] = useState(false)
+  useEffect(() => {
+    if (!updatedAt) return
+    const changed = new Date(updatedAt).getTime()
+    const key = `seen:${slug}`
+    let seen = 0
+    try { seen = Number(localStorage.getItem(key)) || 0; localStorage.setItem(key, String(Date.now())) } catch { /* private mode */ }
+    const before = seen || (lastOpenedAt ? new Date(lastOpenedAt).getTime() : 0)
+    if (before && changed > before) setShow(true)
+  }, [slug, updatedAt, lastOpenedAt])
+  if (!show || !updatedAt) return null
+  const when = new Date(updatedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', timeZone: 'Asia/Karachi' })
+  return (
+    <div className="inv-updated" role="status">
+      <b>Updated on {when}.</b> The host changed some details since you last opened this card. Please check the date, time and venue again.
+      <button type="button" aria-label="Close" onClick={() => setShow(false)}>×</button>
+    </div>
+  )
 }
 
 function Gallery({ urls }: { urls: string[] }) {
@@ -173,9 +207,11 @@ type ViewProps = {
   trackSlug?: string
   /** Editor preview: RSVP is shown but not sent. */
   preview?: boolean
+  /** When the host last changed the card's details (for the "updated" notice). */
+  updatedAt?: string | null
 }
 
-export default function InvitationView({ content, design, invitationId, skipOpening, guest, trackSlug, preview }: ViewProps) {
+export default function InvitationView({ content, design, invitationId, skipOpening, guest, trackSlug, preview, updatedAt }: ViewProps) {
   const t = cardText.en
   const hasOpening = !skipOpening && design.opening !== 'none'
   const [stage, setStage] = useState<'closed' | 'opening' | 'open'>(hasOpening ? 'closed' : 'open')
@@ -208,7 +244,7 @@ export default function InvitationView({ content, design, invitationId, skipOpen
   return (
     <div className={`inv layout-${design.layout} card-${design.cardStyle} photo-${design.photoShape || 'circle'}${hasScene ? ` has-scene scene-on-${design.scene}` : ''}${design.foil ? ' foil' : ''}${stage === 'open' ? ' revealed' : ''}`}
       style={style} lang="en">
-      {trackSlug && !preview && <OpenTracker slug={trackSlug} />}
+      {trackSlug && !preview && <OpenTracker slug={trackSlug} token={guest?.token} />}
       <Scene kind={design.scene} />
       <Effects kind={design.effect} color={design.accent} />
       {content.musicUrl && <audio ref={audio} src={content.musicUrl} loop preload="none" />}
@@ -226,6 +262,7 @@ export default function InvitationView({ content, design, invitationId, skipOpen
       )}
 
       <main className="inv-card">
+        {trackSlug && !preview && <UpdatedNotice slug={trackSlug} updatedAt={updatedAt} lastOpenedAt={guest?.last_opened_at} />}
         {guest && <p className="inv-dear">Dear <b>{guest.name}</b>{guest.party_size > 1 ? ' & family' : ''},</p>}
         {content.showBismillah && <p className="inv-bism">{t.bismillah}</p>}
         <p className="inv-kicker">{content.eventType}</p>

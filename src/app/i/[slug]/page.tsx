@@ -6,11 +6,12 @@ import { sanitizeCanvas } from '@/lib/canvas'
 import { loadPublicCard } from '@/lib/publicCard'
 import { normalize, type EventItem } from '@/lib/types'
 
-type Props = { params: Promise<{ slug: string }> }
+/** `token` is set on a guest's personal link (your-site.com/ali-khan/<code>). */
+type Props = { params: Promise<{ slug: string; token?: string }> }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const { slug } = await params
-  const found = await loadPublicCard(slug)
+  const { slug, token } = await params
+  const found = await loadPublicCard(slug, token)
   if (!found) return { title: 'Invitation not found' }
   const { card, guest } = found
   const dear = guest ? `${guest.name}, you are invited` : 'You are invited'
@@ -26,16 +27,18 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export default async function InvitationPage({ params }: Props) {
-  const { slug } = await params
-  const found = await loadPublicCard(slug)
+  const { slug, token } = await params
+  const found = await loadPublicCard(slug, token)
   if (!found) notFound()
   const { card, guest, canReply } = found
+  const updatedAt = card.details_updated_at ?? null
   if (card.kind === 'canvas') return <CanvasPage doc={sanitizeCanvas(card.canvas)} guest={guest} slug={slug} canReply={canReply} invitationId={card.id} title={String((card.content as { name1?: string } | null)?.name1 ?? '')}
+    updatedAt={updatedAt}
     events={Array.isArray((card.content as { events?: unknown } | null)?.events) ? ((card.content as { events: EventItem[] }).events.filter((e) => e && typeof e.name === 'string' && e.name.trim())) : []} />
   const { content, design } = normalize(card.content as never, card.design as never, card.template)
   return (
     <div className="full">
-      <InvitationView content={content} design={design} invitationId={canReply ? card.id : undefined} guest={guest} trackSlug={slug} />
+      <InvitationView content={content} design={design} invitationId={canReply ? card.id : undefined} guest={guest} trackSlug={slug} updatedAt={updatedAt} />
     </div>
   )
 }

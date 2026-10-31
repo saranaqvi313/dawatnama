@@ -1,7 +1,8 @@
 /** Starting designs for the drag-and-drop designer (shown on the home page). No sample names. */
 import { sanitizeCanvas, type CanvasDoc, type CanvasEl } from './canvas'
+import type { CategoryId } from './categories'
 
-export type CanvasTemplate = { id: string; name: string; tag: string; doc: CanvasDoc }
+export type CanvasTemplate = { id: string; name: string; tag: string; categories: CategoryId[]; doc: CanvasDoc }
 
 let n = 0
 const id = () => `t${n++}`
@@ -78,9 +79,9 @@ const walimaNight: CanvasDoc = sanitizeCanvas({
 })
 
 export const CANVAS_TEMPLATES: CanvasTemplate[] = [
-  { id: 'shahi-nikah', name: 'Shahi Nikah', tag: 'Nikah', doc: shahiNikah },
-  { id: 'mehndi-rang', name: 'Mehndi Rang', tag: 'Mehndi', doc: mehndiRang },
-  { id: 'walima-night', name: 'Walima Night', tag: 'Walima', doc: walimaNight },
+  { id: 'shahi-nikah', name: 'Shahi Nikah', tag: 'Nikah', categories: ['nikah'], doc: shahiNikah },
+  { id: 'mehndi-rang', name: 'Mehndi Rang', tag: 'Mehndi', categories: ['mehndi'], doc: mehndiRang },
+  { id: 'walima-night', name: 'Walima Night', tag: 'Walima', categories: ['walima'], doc: walimaNight },
 ]
 
 export const getCanvasTemplate = (templateId: string) => CANVAS_TEMPLATES.find((t) => t.id === templateId)

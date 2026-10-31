@@ -4,6 +4,7 @@ import Link from 'next/link'
 import Button from '@/components/Button'
 import Icon from '@/components/Icon'
 import { saveCanvas } from '@/app/actions'
+import { generateAiDesign } from '@/app/aiActions'
 import { PAY_MESSAGES } from '../SharePaywall'
 import UnlockCardLink from '../UnlockCardLink'
 import QrButton from '../QrButton'
@@ -21,7 +22,7 @@ import { videoEmbed } from '@/lib/media'
 import { FREE_MODE } from '@/lib/pricing'
 import OrnamentSvg from './OrnamentSvg'
 
-type Props = { invitationId: string; userId: string; slug: string; siteUrl: string; initial: CanvasDoc; initialTitle: string; initialPublished: boolean; sharePaid: boolean; credits: number; payResult?: string }
+type Props = { invitationId: string; userId: string; slug: string; siteUrl: string; initial: CanvasDoc; initialTitle: string; initialPublished: boolean; sharePaid: boolean; credits: number; payResult?: string; openAi?: boolean }
 type Drag =
   | { mode: 'move'; id: string; sx: number; sy: number; ox: number; oy: number }
   | { mode: 'resize'; id: string; corner: 'nw' | 'ne' | 'sw' | 'se'; sx: number; sy: number; o: { x: number; y: number; w: number; h: number } }
@@ -44,7 +45,7 @@ const FILTER_LABEL: Record<string, string> = { none: 'Original', warm: 'Warm', c
 const MASK_LABEL: Record<string, string> = { none: 'Corners', circle: 'Circle', arch: 'Arch', heart: 'Heart', blob: 'Blob' }
 const ORNAMENT_LABEL: Record<string, string> = { mandala: 'Mandala', divider: 'Divider', corner: 'Corner', lantern: 'Lantern', crescent: 'Crescent', leaf: 'Leaves', flower: 'Flower', star: 'Star' }
 
-export default function Designer({ invitationId, userId, slug, siteUrl, initial, initialTitle, initialPublished, sharePaid: paid0, credits: credits0, payResult }: Props) {
+export default function Designer({ invitationId, userId, slug, siteUrl, initial, initialTitle, initialPublished, sharePaid: paid0, credits: credits0, payResult, openAi }: Props) {
   const [sharePaid, setSharePaid] = useState(paid0)
   const [credits, setCredits] = useState(credits0)
   const [doc, setDocState] = useState<CanvasDoc>(initial)
@@ -55,7 +56,10 @@ export default function Designer({ invitationId, userId, slug, siteUrl, initial,
   const [status, setStatus] = useState(payResult ? PAY_MESSAGES[payResult] ?? '' : '')
   const [busyBtn, setBusyBtn] = useState<'save' | 'publish' | ''>('')
   const [saving, setSaving] = useState(false)
-  const [panel, setPanel] = useState<'add' | 'element' | 'background' | 'magic' | 'layers' | 'share'>(payResult ? 'share' : 'add')
+  const [panel, setPanel] = useState<'ai' | 'add' | 'element' | 'background' | 'magic' | 'layers' | 'share'>(payResult ? 'share' : openAi ? 'ai' : 'add')
+  const [aiPrompt, setAiPrompt] = useState('')
+  const [aiImage, setAiImage] = useState('')
+  const [aiBusy, setAiBusy] = useState(false)
   const [playKey, setPlayKey] = useState(0)
   const [playing, setPlaying] = useState(false)
   const [guides, setGuides] = useState<{ v: boolean; h: boolean }>({ v: false, h: false })
@@ -324,6 +328,18 @@ export default function Designer({ invitationId, userId, slug, siteUrl, initial,
       setStatus(kind === 'video' ? 'Video added.' : 'Image added.')
     } catch (e) { setStatus((e as Error).message) }
   }
+  /** AI designer: replaces the card with a new design (one undo step, not saved until the host saves). */
+  async function runAi() {
+    setAiBusy(true); setStatus('The AI is designing your card. This can take up to a minute…')
+    const res = await generateAiDesign(invitationId, { prompt: aiPrompt, imageUrl: aiImage || undefined })
+    setAiBusy(false)
+    if (!res.ok) return setStatus(res.error)
+    commit(res.doc)
+    setSelected(null)
+    if (res.title && /^(my card|my ai card|designer card)$/i.test(title.trim())) setTitle(res.title)
+    setStatus(`${res.summary} Not saved yet: press Save to keep it, or Undo to go back.${res.left !== undefined ? ` (${res.left} AI designs left today)` : ''}`)
+  }
+
   async function uploadMusic(file: File | undefined) {
     if (!file) return
     if (!/^audio\//.test(file.type)) return setStatus('Please choose an MP3 or other audio file.')
@@ -355,12 +371,35 @@ export default function Designer({ invitationId, userId, slug, siteUrl, initial,
         </header>
 
         <nav className="dz-tabs" role="tablist">
-          {([['add', 'Add'], ['element', 'Edit'], ['background', 'Background'], ['magic', 'Magic'], ['layers', 'Layers'], ['share', 'Share']] as const).map(([k, l]) => (
+          {([['ai', '✨ AI'], ['add', 'Add'], ['element', 'Edit'], ['background', 'Background'], ['magic', 'Magic'], ['layers', 'Layers'], ['share', 'Share']] as const).map(([k, l]) => (
             <button key={k} role="tab" aria-selected={panel === k} className={panel === k ? 'on' : ''} onClick={() => setPanel(k)}>{l}</button>
           ))}
         </nav>
 
         <div className="dz-body">
+          {panel === 'ai' && (
+            <>
+              <p className="dz-hint">Show the AI a design you like (a screenshot from Pinterest, Canva or Instagram) and tell it about your event. It builds the card here; then you can change anything.</p>
+              <Section title="1. A design you like">
+                {aiImage && <img src={aiImage} alt="Your reference design" className="w-full max-h-64 object-contain rounded-2xl bg-b-surface2" />}
+                <label className="file">{aiImage ? 'Use another picture' : 'Upload a picture (optional)'}
+                  <input type="file" accept="image/png,image/jpeg,image/webp" disabled={aiBusy} onChange={(e) => upload(e.target.files?.[0], setAiImage)} />
+                </label>
+                {aiImage && <button type="button" className="link" onClick={() => setAiImage('')}>Remove picture</button>}
+              </Section>
+              <Section title="2. Describe your card">
+                <label>Names, event, date, time, venue, colours, anything to change from the picture
+                  <textarea rows={7} maxLength={2000} value={aiPrompt} disabled={aiBusy} dir="auto" onChange={(e) => setAiPrompt(e.target.value)}
+                    placeholder={'Nikah of Ayesha & Hamza\nSaturday 20 December 2026, 7 pm\nServis Marquee, Lahore\nLike the picture but in emerald green and gold, with our photo in an arch'} />
+                </label>
+              </Section>
+              <Button isBlack className="w-full" disabled={aiBusy || (!aiImage && aiPrompt.trim().length < 10)} aria-busy={aiBusy || undefined} onClick={runAi}>
+                {aiBusy ? 'Designing… (up to a minute)' : doc.elements.length ? 'Design my card (replaces this design)' : 'Design my card'}
+              </Button>
+              <p className="dz-hint">The AI uses this designer&apos;s fonts, ornaments and scenes, so the result is close to the picture, not an exact copy. Photo frames are left empty for you to add your own photos. Not happy? Undo brings back the previous card.</p>
+            </>
+          )}
+
           {panel === 'add' && (
             <>
               <p className="dz-hint">Drag an item onto the card, or click to add it in the middle.</p>

@@ -34,7 +34,17 @@ select pg_temp.denied($$select public.activate_guest_links(array['30000000-0000-
                       'no credits, no live link');
 update public.profiles set link_credits = 99;
 select pg_temp.ok(coalesce((select link_credits from public.profiles where user_id = auth.uid()), 0) = 0, 'cannot give yourself credits');
+insert into public.guests (invitation_id, name, slug, token) values ('20000000-0000-0000-0000-000000000001', 'Picked', 'picked-code', 'aaaaaaaaaaaa');
+select pg_temp.ok((select token <> 'aaaaaaaaaaaa' and token ~ '^[0-9a-f]{12}$' from public.guests where slug = 'picked-code'), 'the database makes the link code, not the owner');
+select pg_temp.denied($$update public.guests set token = 'bbbbbbbbbbbb' where slug = 'picked-code'$$, 'owner cannot change a link code');
+delete from public.guests where slug = 'picked-code';
 reset role;
+-- Known codes for the checks below (only the site itself can set them).
+set local dawatnama.trusted = 'on';
+update public.guests set token = 'alikhan00001' where slug = 'ali-khan';
+update public.guests set token = 'hina00000002' where slug = 'hina';
+update public.guests set token = 'zarafamily03' where slug = 'zara-family';
+set local dawatnama.trusted = 'off';
 
 -- Server completes a 5-link bundle and a wedding package for a1
 set local role service_role;
@@ -59,7 +69,7 @@ select pg_temp.ok((select link_credits = 0 from public.profiles where user_id = 
 select pg_temp.denied($$update public.guests set slug = 'ali-k' where slug = 'ali-khan'$$, 'a live guest link cannot be renamed');
 update public.guests set name = 'Ali Khan Sahab', party_size = 4 where slug = 'ali-khan';
 select pg_temp.ok(true, 'owner can still edit the guest name and party size');
-select public.record_open('ali-khan');
+select public.record_open('ali-khan', 'alikhan00001');
 select pg_temp.ok((select open_count = 0 from public.guests where slug = 'ali-khan'), 'owner opening the link is not counted');
 reset role;
 
@@ -75,15 +85,21 @@ reset role;
 -- ---- Guests (anon)
 set local role anon;
 set local request.jwt.claim.sub = '';
-select pg_temp.ok((public.guest_invite('ali-khan')->'guest'->>'name') = 'Ali Khan Sahab', 'live guest link opens the card with the guest''s name');
-select pg_temp.ok(public.guest_invite('zara-family') is null, 'guest link that is not live shows nothing');
-select pg_temp.ok((public.guest_invite('ali-khan')->'invitation') ? 'user_id' = false, 'guest view does not expose the owner id');
-select public.record_open('ali-khan'); select public.record_open('ali-khan');
-select pg_temp.ok(public.submit_guest_rsvp('ali-khan', '[{"event":"Mehndi","attending":"yes","guests":9},{"event":"Baraat","attending":"no","guests":2}]', 'Mubarak!'),
+select pg_temp.ok((public.guest_invite('ali-khan', 'alikhan00001')->'guest'->>'name') = 'Ali Khan Sahab', 'live guest link opens the card with the guest''s name');
+select pg_temp.ok(public.guest_invite('zara-family', 'zarafamily03') is null, 'guest link that is not live shows nothing');
+select pg_temp.ok((public.guest_invite('ali-khan', 'alikhan00001')->'invitation') ? 'user_id' = false, 'guest view does not expose the owner id');
+select pg_temp.ok(public.guest_invite('ali-khan', 'hina00000002') is null, 'another guest''s code does not open Ali''s card');
+select pg_temp.ok(public.guest_invite('hina', 'alikhan00001') is null, 'putting another name in front of your code shows nothing');
+select pg_temp.ok(public.guest_invite('ali-khan', 'alikhan00002') is null, 'a guessed code shows nothing');
+select public.record_open('hina', 'alikhan00001');
+select public.record_open('ali-khan', 'alikhan00001', 'visitor-one'); select public.record_open('ali-khan', 'alikhan00001', 'visitor-one');
+select pg_temp.ok(not public.submit_guest_rsvp('ali-khan', 'hina00000002', '[{"event":"Mehndi","attending":"no"}]', ''), 'cannot reply for a guest with someone else''s code');
+select pg_temp.ok(public.submit_guest_rsvp('ali-khan', 'alikhan00001', '[{"event":"Mehndi","attending":"yes","guests":9},{"event":"Baraat","attending":"no","guests":2}]', 'Mubarak!'),
                   'guest replies per event');
-select pg_temp.ok(public.submit_guest_rsvp('ali-khan', '[{"event":"Mehndi","attending":"yes","guests":2},{"event":"Baraat","attending":"maybe","guests":1}]', ''),
+select pg_temp.ok(public.submit_guest_rsvp('ali-khan', 'alikhan00001', '[{"event":"Mehndi","attending":"yes","guests":2},{"event":"Baraat","attending":"maybe","guests":1}]', ''),
                   'guest can change their reply');
-select pg_temp.ok(not public.submit_guest_rsvp('zara-family', '[{"event":"Mehndi","attending":"yes"}]', ''), 'no reply through a link that is not live');
+select pg_temp.ok(not public.submit_guest_rsvp('zara-family', 'zarafamily03', '[{"event":"Mehndi","attending":"yes"}]', ''), 'no reply through a link that is not live');
+select pg_temp.ok((select count(*) = 0 from public.card_views), 'visit log is not readable by the public');
 select pg_temp.denied($$insert into public.rsvps (invitation_id, guest_id, name, attending) values ('20000000-0000-0000-0000-000000000001', '30000000-0000-0000-0000-000000000001', 'Fake', 'yes')$$,
                       'cannot post a reply as a guest directly');
 select pg_temp.ok((select count(*) = 0 from public.guests), 'guests table is not readable by the public');
@@ -95,6 +111,16 @@ select pg_temp.ok((select open_count = 2 and opened_at is not null from public.g
 select pg_temp.ok((select count(*) = 2 from public.rsvps where guest_id = '30000000-0000-0000-0000-000000000001'), 'second reply replaced the first');
 select pg_temp.ok((select guests = 2 from public.rsvps where event_name = 'Mehndi'), 'party size is capped at what the host allowed');
 select pg_temp.ok((select sum(guests) = 3 from public.rsvps where attending <> 'no'), 'food headcount adds up per event');
+select pg_temp.ok((select open_count = 0 from public.guests where slug = 'hina'), 'a wrong code is not counted as an open');
+select pg_temp.ok((select count(*) = 1 from public.card_views where guest_id = '30000000-0000-0000-0000-000000000001'), 'repeat visits within 30 minutes are logged once');
+select public.rename_card_events('20000000-0000-0000-0000-000000000001', array['Mehndi'], array['Mehndi Night']);
+select pg_temp.ok((select events = '{Mehndi Night,Baraat}' from public.guests where slug = 'ali-khan'), 'renamed function: guest invitations follow');
+select pg_temp.ok((select count(*) = 1 from public.rsvps where event_name = 'Mehndi Night'), 'renamed function: replies follow');
+reset role;
+set local role authenticated;
+set local request.jwt.claim.sub = '00000000-0000-0000-0000-0000000000b2';
+select pg_temp.denied($$select public.rename_card_events('20000000-0000-0000-0000-000000000001', array['Baraat'], array['X'])$$, 'cannot rename functions on someone else''s card');
+select pg_temp.ok((select count(*) = 0 from public.card_views), 'other users cannot read the visit log');
 reset role;
 
 -- Wedding package: Premium + credits; card open link uses one credit

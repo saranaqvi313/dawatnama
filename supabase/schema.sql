@@ -647,3 +647,173 @@ begin
 end $$;
 revoke all on function public.activate_card_link(uuid) from public, anon;
 grant execute on function public.activate_card_link(uuid) to authenticated;
+
+
+-- ======================================================================================
+-- Secret codes on guest links, view analytics, renaming functions and AI design limits
+-- (added 2026-11). Safe to run again.
+-- ======================================================================================
+
+-- ---- Every guest link carries a secret code: your-site.com/ali-khan/3f9a1c7b2d4e.
+-- Typing another guest's name into the address no longer opens their card.
+alter table public.guests add column if not exists token text not null default substr(replace(gen_random_uuid()::text, '-', ''), 1, 12);
+do $$ begin
+  alter table public.guests add constraint guests_token_format check (token ~ '^[a-z0-9]{12,32}$');
+exception when duplicate_object then null; end $$;
+create unique index if not exists guests_token_idx on public.guests(token);
+
+-- The code is always made by the database and never changed by the owner.
+create or replace function public.guard_guest() returns trigger
+language plpgsql security definer set search_path = '' as $$
+begin
+  if public.is_trusted() then return new; end if;
+  if tg_op = 'INSERT' then
+    if new.link_active or new.activated_at is not null or new.open_count <> 0 or new.opened_at is not null or new.last_opened_at is not null then
+      raise exception 'payment_required' using errcode = 'P0001', hint = 'Use a link credit to make a guest link live.';
+    end if;
+    new.token := substr(replace(gen_random_uuid()::text, '-', ''), 1, 12);
+  else
+    if new.link_active is distinct from old.link_active or new.activated_at is distinct from old.activated_at
+       or new.open_count is distinct from old.open_count or new.opened_at is distinct from old.opened_at
+       or new.last_opened_at is distinct from old.last_opened_at or new.invitation_id is distinct from old.invitation_id
+       or new.token is distinct from old.token then
+      raise exception 'not_allowed' using errcode = 'P0001', hint = 'This field is managed by the site.';
+    end if;
+    if old.link_active and new.slug is distinct from old.slug then
+      raise exception 'link_locked' using errcode = 'P0001', hint = 'A live guest link cannot be renamed.';
+    end if;
+  end if;
+  return new;
+end $$;
+
+-- ---- When the card's details (not its counters) last changed, so guests can be told.
+alter table public.invitations add column if not exists details_updated_at timestamptz;
+drop trigger if exists invitations_details_touch on public.invitations;
+update public.invitations set details_updated_at = updated_at where details_updated_at is null;
+create or replace function public.touch_details() returns trigger
+language plpgsql as $$
+begin
+  if tg_op = 'INSERT' then
+    new.details_updated_at := coalesce(new.details_updated_at, now());
+  elsif new.content is distinct from old.content or new.canvas is distinct from old.canvas or new.design is distinct from old.design then
+    new.details_updated_at := now();
+  else
+    new.details_updated_at := old.details_updated_at;
+  end if;
+  return new;
+end $$;
+create trigger invitations_details_touch before insert or update on public.invitations
+  for each row execute function public.touch_details();
+
+-- What guests see: only with the right name AND code.
+drop function if exists public.guest_invite(text);
+create or replace function public.guest_invite(p_slug text, p_token text) returns jsonb
+language sql stable security definer set search_path = '' as $$
+  select jsonb_build_object(
+    'invitation', to_jsonb(i) - 'user_id',
+    'guest', jsonb_build_object('id', g.id, 'name', g.name, 'party_size', g.party_size, 'events', g.events, 'slug', g.slug,
+                                'token', g.token, 'last_opened_at', g.last_opened_at))
+  from public.guests g join public.invitations i on i.id = g.invitation_id
+  where g.slug = p_slug and g.token = p_token and g.link_active
+$$;
+revoke all on function public.guest_invite(text, text) from public;
+grant execute on function public.guest_invite(text, text) to anon, authenticated, service_role;
+
+-- ---- One row per visit, for the card's analytics (unique visitors, opens per day).
+create table if not exists public.card_views (
+  id bigint generated always as identity primary key,
+  invitation_id uuid not null references public.invitations(id) on delete cascade,
+  guest_id uuid references public.guests(id) on delete cascade,
+  visitor text check (visitor is null or visitor ~ '^[A-Za-z0-9_-]{8,40}$'),
+  created_at timestamptz not null default now()
+);
+create index if not exists card_views_invitation_idx on public.card_views(invitation_id, created_at desc);
+alter table public.card_views enable row level security;
+drop policy if exists "owner read views" on public.card_views;
+create policy "owner read views" on public.card_views for select to authenticated
+  using (exists (select 1 from public.invitations i where i.id = invitation_id and i.user_id = auth.uid()));
+
+-- Counts an open (the card owner's own visits are not counted). A guest link needs its code.
+-- The same visitor is logged at most once per 30 minutes.
+drop function if exists public.record_open(text);
+create or replace function public.record_open(p_slug text, p_token text default null, p_visitor text default null) returns void
+language plpgsql security definer set search_path = '' as $$
+declare v_inv uuid; v_guest uuid; v_vis text := case when p_visitor ~ '^[A-Za-z0-9_-]{8,40}$' then p_visitor end;
+begin
+  perform set_config('dawatnama.trusted', 'on', true);
+  if p_token is not null then
+    update public.guests set open_count = open_count + 1, opened_at = coalesce(opened_at, now()), last_opened_at = now()
+     where slug = p_slug and token = p_token and link_active and user_id is distinct from auth.uid()
+    returning id, invitation_id into v_guest, v_inv;
+  else
+    update public.invitations set open_count = open_count + 1
+     where slug = p_slug and published and share_paid and user_id is distinct from auth.uid()
+    returning id into v_inv;
+  end if;
+  if v_inv is not null and not exists (
+    select 1 from public.card_views
+     where invitation_id = v_inv and guest_id is not distinct from v_guest and visitor is not distinct from v_vis
+       and created_at > now() - interval '30 minutes') then
+    insert into public.card_views (invitation_id, guest_id, visitor) values (v_inv, v_guest, v_vis);
+  end if;
+  perform set_config('dawatnama.trusted', 'off', true);
+end $$;
+revoke all on function public.record_open(text, text, text) from public;
+grant execute on function public.record_open(text, text, text) to anon, authenticated;
+
+-- A guest replies through their own link (name + code); replying again replaces the earlier reply.
+drop function if exists public.submit_guest_rsvp(text, jsonb, text);
+create or replace function public.submit_guest_rsvp(p_slug text, p_token text, p_rows jsonb, p_message text) returns boolean
+language plpgsql security definer set search_path = '' as $$
+declare g public.guests; r jsonb; v_att text; v_n int;
+begin
+  select * into g from public.guests where slug = p_slug and token = p_token and link_active;
+  if g.id is null or jsonb_typeof(p_rows) <> 'array' or jsonb_array_length(p_rows) = 0 or jsonb_array_length(p_rows) > 20 then
+    return false;
+  end if;
+  delete from public.rsvps where guest_id = g.id;
+  for r in select * from jsonb_array_elements(p_rows) loop
+    v_att := case when r->>'attending' in ('yes', 'no', 'maybe') then r->>'attending' else 'yes' end;
+    v_n := case when v_att = 'no' then 0 else least(greatest(coalesce((r->>'guests')::int, 1), 1), g.party_size) end;
+    insert into public.rsvps (invitation_id, guest_id, name, attending, guests, message, event_name)
+    values (g.invitation_id, g.id, g.name, v_att, v_n, nullif(left(coalesce(p_message, ''), 500), ''), nullif(left(coalesce(r->>'event', ''), 80), ''));
+  end loop;
+  return true;
+end $$;
+revoke all on function public.submit_guest_rsvp(text, text, jsonb, text) from public;
+grant execute on function public.submit_guest_rsvp(text, text, jsonb, text) to anon, authenticated;
+
+-- ---- A function renamed in the editor (e.g. "Nikah" -> "Nikah & Rukhsati"): guests invited to it
+-- and the replies already given follow the new name.
+create or replace function public.rename_card_events(p_invitation_id uuid, p_from text[], p_to text[]) returns void
+language plpgsql security definer set search_path = '' as $$
+declare i int;
+begin
+  if not exists (select 1 from public.invitations where id = p_invitation_id and user_id = auth.uid()) then
+    raise exception 'not_found';
+  end if;
+  if coalesce(array_length(p_from, 1), 0) <> coalesce(array_length(p_to, 1), 0) or coalesce(array_length(p_from, 1), 0) > 20 then
+    raise exception 'bad_input';
+  end if;
+  for i in 1 .. coalesce(array_length(p_from, 1), 0) loop
+    update public.guests set events = array_replace(events, p_from[i], left(p_to[i], 80))
+     where invitation_id = p_invitation_id and p_from[i] = any(events);
+    update public.rsvps set event_name = left(p_to[i], 80)
+     where invitation_id = p_invitation_id and event_name = p_from[i];
+  end loop;
+end $$;
+revoke all on function public.rename_card_events(uuid, text[], text[]) from public, anon;
+grant execute on function public.rename_card_events(uuid, text[], text[]) to authenticated;
+
+-- ---- AI card designs: one row per request, to keep a daily limit per account.
+create table if not exists public.ai_generations (
+  id bigint generated always as identity primary key,
+  user_id uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  created_at timestamptz not null default now()
+);
+create index if not exists ai_generations_user_idx on public.ai_generations(user_id, created_at desc);
+alter table public.ai_generations enable row level security;
+drop policy if exists "own ai rows" on public.ai_generations;
+create policy "own ai rows" on public.ai_generations for select to authenticated using (user_id = auth.uid());
+drop policy if exists "add own ai rows" on public.ai_generations;
+create policy "add own ai rows" on public.ai_generations for insert to authenticated with check (user_id = auth.uid());

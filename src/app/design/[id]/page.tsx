@@ -7,10 +7,12 @@ import { isPremium, linkCredits } from '@/lib/premium'
 import { createClient } from '@/lib/supabase/server'
 
 export const metadata = { title: 'Designer — Dawatnama' }
+// The AI designer (a server action on this page) can take a minute.
+export const maxDuration = 120
 
-export default async function DesignPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ pay?: string }> }) {
+export default async function DesignPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ pay?: string; ai?: string }> }) {
   const { id } = await params
-  const pay = (await searchParams).pay
+  const { pay, ai } = await searchParams
   const supabase = await createClient()
   const { data: auth } = await supabase.auth.getUser()
   if (!auth.user) redirect(`/login?next=/design/${id}`)
@@ -24,7 +26,7 @@ export default async function DesignPage({ params, searchParams }: { params: Pro
     <Shell title="Designer" hideSidebar>
     <Designer invitationId={data.id} userId={auth.user.id} slug={data.slug} siteUrl={siteUrl}
       initial={sanitizeCanvas(data.canvas)} initialTitle={String(data.content?.name1 || 'My card')} initialPublished={data.published}
-      sharePaid={Boolean(data.share_paid)} credits={await linkCredits(supabase, auth.user.id)} payResult={pay} />
+      sharePaid={Boolean(data.share_paid)} credits={await linkCredits(supabase, auth.user.id)} payResult={pay} openAi={ai === '1'} />
     </Shell>
   )
 }

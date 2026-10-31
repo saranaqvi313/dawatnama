@@ -49,6 +49,7 @@ export default function InvitationsBoard({ cards, title = 'Invitations', compact
       <Link className="action" href={c.editHref}><Icon name="edit" />Edit</Link>
       {c.kind === 'canvas' && <Link className="action" href={`/design/${c.id}/preview`} target="_blank"><Icon name="video" />Preview</Link>}
       <Link className="action" href={`/dashboard/${c.id}/guests`}><Icon name="profile" />Guests</Link>
+      <Link className="action" href={`/dashboard/${c.id}/analytics`}><Icon name="chart" />Analytics</Link>
       {c.published && <a className="action" href={`/${c.slug}`} target="_blank" rel="noreferrer"><Icon name="arrow-up-right" />View</a>}
       <DeleteItems onDelete={() => remove([c.id])} content={`This will delete "${c.title}", its guest list and replies. Live links stop working and used links are not refunded. This cannot be undone.`} />
     </>
@@ -93,7 +94,13 @@ export default function InvitationsBoard({ cards, title = 'Invitations', compact
               <GridCard key={c.id} title={c.title} badge={status(c)}
                 details={`${c.eventType || 'Invitation'}${c.kind === 'canvas' ? ' · Designer card' : ''} · ${c.replies} repl${c.replies === 1 ? 'y' : 'ies'}`}
                 thumb={<Link href={c.editHref} className="block size-full"><CardThumb title={c.title} design={c.design} canvas={c.canvas} className="size-full" /></Link>}
-                actions={actions(c)} />
+                actions={actions(c)}
+                footer={
+                  <Button className="w-full !h-10 !text-caption" isStroke as="link" href={`/dashboard/${c.id}/analytics`}>
+                    <Icon className="mr-2 fill-inherit" name="chart" />
+                    Analytics · {c.opens + c.guestsOpened} opened · {c.replies} repl{c.replies === 1 ? 'y' : 'ies'} · {c.coming} coming
+                  </Button>
+                } />
             ))}
           </Grid>
         </div>

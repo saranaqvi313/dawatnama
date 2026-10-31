@@ -9,6 +9,8 @@ import { classicToCanvas } from '@/lib/classicToCanvas'
 import { normalize } from '@/lib/types'
 import { getCanvasTemplate } from '@/lib/canvasTemplates'
 import { slugProblem, toSlug } from '@/lib/slug'
+import { renamedEvents } from '@/lib/guestStats'
+import { getCategory } from '@/lib/categories'
 
 export type RsvpRow = { event?: string; attending: string; guests: number }
 
@@ -34,10 +36,11 @@ export async function submitRsvp(input: { invitationId: string; name: string; me
 }
 
 /** RSVP through a guest's personal link (replying again replaces the earlier reply). */
-export async function submitGuestRsvp(input: { slug: string; message: string; rows: RsvpRow[] }) {
+export async function submitGuestRsvp(input: { slug: string; token: string; message: string; rows: RsvpRow[] }) {
   const supabase = await createClient()
   const { data, error } = await supabase.rpc('submit_guest_rsvp', {
     p_slug: String(input.slug ?? '').slice(0, 80),
+    p_token: String(input.token ?? '').slice(0, 32),
     p_rows: (input.rows ?? []).slice(0, 20).map((r) => ({ event: r.event ?? '', attending: r.attending, guests: Number(r.guests) || 1 })),
     p_message: String(input.message ?? '').slice(0, 500),
   })
@@ -71,13 +74,17 @@ export async function saveInvitation(id: string, patch: { content: Content; desi
   const { data: auth } = await supabase.auth.getUser()
   if (!auth.user) return { ok: false, published: false, error: 'Please sign in again.' }
   const premium = await isPremium(supabase, auth.user.id)
-  const { data: row } = await supabase.from('invitations').select('share_paid').eq('id', id).eq('user_id', auth.user.id).maybeSingle()
+  const { data: row } = await supabase.from('invitations').select('share_paid, content').eq('id', id).eq('user_id', auth.user.id).maybeSingle()
   if (!row) return { ok: false, published: false, error: 'Card not found.' }
   // Publishing (the share link) needs this card to be paid for; the database enforces it too.
   const published = Boolean(patch.published && row.share_paid)
   // Free accounts save details and events only; the database rejects design changes too.
   const update = premium ? { ...patch, published } : { content: patch.content, published }
   const { error } = await supabase.from('invitations').update(update).eq('id', id).eq('user_id', auth.user.id)
+  if (!error) {
+    const renames = renamedEvents((row.content as Partial<Content> | null)?.events, patch.content.events)
+    if (renames.from.length) await supabase.rpc('rename_card_events', { p_invitation_id: id, p_from: renames.from, p_to: renames.to })
+  }
   return saveResult(error, published)
 }
 
@@ -165,6 +172,23 @@ export async function createBlankCard() {
     .single()
   if (error || !data) redirect('/dashboard?error=create')
   redirect(`/design/${data.id}`)
+}
+
+/** A new designer card that opens on the AI panel ("Create with AI": upload a design you like, describe your card). */
+export async function createAiCard(formData: FormData) {
+  const supabase = await createClient()
+  const { data: auth } = await supabase.auth.getUser()
+  if (!auth.user) redirect('/login?next=/templates')
+  if (!(await isPremium(supabase, auth.user.id))) redirect('/premium?from=designer')
+  const category = getCategory(String(formData.get('category') || ''))
+  const { data, error } = await supabase
+    .from('invitations')
+    .insert({ user_id: auth.user.id, slug: `card-${Math.random().toString(36).slice(2, 9)}`, template: 'blank', kind: 'canvas', canvas: emptyCanvas(),
+      content: { eventType: category?.name ?? 'Invitation', name1: 'My AI card' }, design: {} })
+    .select('id')
+    .single()
+  if (error || !data) redirect('/dashboard?error=create')
+  redirect(`/design/${data.id}?ai=1`)
 }
 
 /** Opens any ready-made template in the drag-and-drop designer, so every part can be changed. */
