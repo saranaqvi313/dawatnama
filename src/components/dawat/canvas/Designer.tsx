@@ -459,7 +459,7 @@ export default function Designer({ invitationId, userId, slug, siteUrl, initial,
                   <Section title="2. Describe your card">
                     <label>Names, event, date, time, venue, colours, anything to change from the picture
                       <textarea data-square rows={7} maxLength={2000} value={aiPrompt} disabled={aiBusy} dir="auto" onChange={(e) => setAiPrompt(e.target.value)}
-                        placeholder={'Nikah of Ayesha & Hamza\nSaturday 20 December 2026, 7 pm\nServis Marquee, Lahore\nLike the picture but in emerald green and gold, with our photo in an arch'} />
+                        placeholder={'Nikah of Ayesha & Hamza\nSaturday 20 December 2026, 7 pm\nServis Marquee, Lahore\nLike the picture but in emerald green and gold, with our photo in an arch'} style={{ borderRadius: 'inherit' }}/>
                     </label>
                   </Section>
                 </>
